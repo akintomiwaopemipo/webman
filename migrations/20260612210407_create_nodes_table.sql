@@ -1,0 +1,20 @@
+CREATE TABLE "nodes" (
+	"id"	INTEGER NOT NULL,
+	"node_id"	TEXT NOT NULL UNIQUE,
+	"app_id"	TEXT NOT NULL UNIQUE,
+	"name"	TEXT NOT NULL,
+	"host"	TEXT NOT NULL,
+	"hostname"	TEXT,
+	"rel_dirname"	TEXT,
+	"remote_home_dir"	TEXT,
+	"domain_name"	TEXT NOT NULL,
+	"custom_domain"	TEXT,
+	"node_url"	TEXT NOT NULL,
+	"ssh"	TEXT NOT NULL,
+	"mysql"	TEXT,
+	"backup"	TEXT NOT NULL,
+	"mimics"	TEXT,
+	"active"	INTEGER CHECK("active" IN (0, 1)),
+	"dev_mode"	INTEGER CHECK("dev_mode" IN (0, 1)),
+	PRIMARY KEY("id" AUTOINCREMENT)
+);

@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'mhove'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=mhove",
+                    "--package=mhove"
+                ],
+                "filter": {
+                    "name": "mhove",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "user",
+                "profile",
+                "-n",
+                "api",
+                "--token",
+                "22244556"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'mhove'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=mhove",
+                    "--package=mhove"
+                ],
+                "filter": {
+                    "name": "mhove",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

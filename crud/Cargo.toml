@@ -1,0 +1,13 @@
+[package]
+name = "crud"
+version = "0.1.0"
+authors = ["akintomiwa.opemipo <ibnakintomiwa@gmail.com>"]
+edition = "2024"
+
+[dependencies]
+utils = { path = "../utils" }
+sqlx = { workspace = true }
+sea-query = { workspace = true }
+sea-query-binder = { workspace = true }
+tracing = { workspace = true }
+indexmap = { workspace = true }

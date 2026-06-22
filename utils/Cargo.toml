@@ -1,0 +1,17 @@
+[package]
+name = "utils"
+version = "0.1.0"
+authors = ["mkoakintomiwa <ibnakintomiwa@gmail.com>"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prelude = { path = "../prelude" }
+tokio = { workspace = true }
+eyre = { workspace = true }
+indexmap = { workspace = true }
+regex = { workspace = true }
+rand = { workspace = true }
+russh = { workspace = true }
+russh-sftp = { workspace = true }

@@ -1,0 +1,16 @@
+[package]
+name = "prelude"
+version = "0.1.0"
+authors = ["mkoakintomiwa <ibnakintomiwa@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+mysql = "*"
+indexmap = "1.6.0"
+json = "*"
+regex = "1.8.4"
+subprocess = "0.2.7"
+eyre = "0.6.8"
