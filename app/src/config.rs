@@ -232,6 +232,18 @@ impl Node{
     }
 
 
+    pub async fn active_nodes(pool: &SqlitePool) -> Result<IndexMap<String, NodeData>> {
+        let mut nodes = IndexMap::new();
+        for row in Crud::new(Nodes::Table, pool)
+            .set_column(Nodes::Active, 1.into())
+            .fetch().await?{
+            let node = Self::from_db_row(row)?;
+            nodes.insert(node.node_id.clone(), node);
+        }
+        Ok(nodes)
+    }
+
+
 
     pub async fn add(data: NodeData, pool: &SqlitePool) -> Result<()>{
         Crud::new(Nodes::Table, pool)
