@@ -1,4 +1,4 @@
-use app::config::{Config, Node};
+use app::{app::App, config::{Config, Node}, config_db::ConfigDb};
 use sqlx::SqlitePool;
 use tokio::fs;
 use util::file_put_contents;
@@ -17,7 +17,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
 
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
     
     let push_to_all_nodes = args.all;
 
@@ -51,7 +51,7 @@ async fn push_config(node_id: &str, pool: &SqlitePool) -> Result<()> {
     let node_data = node.data().await?;
 
 
-    let tmp_file = Config::new_tmp_file("json", 7);
+    let tmp_file = App::new_tmp_file("json", 7);
 
     let mut _node  =  json!({
         "node_id": node_id
@@ -72,7 +72,7 @@ async fn push_config(node_id: &str, pool: &SqlitePool) -> Result<()> {
 
     if mysql_opt.is_some(){
         let mysql = mysql_opt.unwrap();
-        cnf_tmp = Some(Config::new_tmp_file("json", 7));
+        cnf_tmp = Some(App::new_tmp_file("json", 7));
         file_put_contents(&cnf_tmp.clone().unwrap(), &format!("[client]\nuser = {}\npassword = {}\n", mysql.username.unwrap_or(node_data.ssh.username.clone()), mysql.password.unwrap_or(node_data.ssh.password.clone().unwrap_or_default())));
 
         ssh.upload(

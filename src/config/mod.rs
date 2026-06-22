@@ -1,4 +1,4 @@
-use app::config::Config;
+use app::{config::Config, config_db::ConfigDb};
 use eyre::Result;
 use prelude::SerdeJsonSerialize;
 mod virtual_host;
@@ -28,7 +28,7 @@ pub async fn action(args: Args) -> Result<()> {
 
         }
     } else {
-        let pool = Config::connection_pool().await?;
+        let pool = ConfigDb::connection_pool().await?;
         Config::new(&pool).data().await?.print();
     }
 

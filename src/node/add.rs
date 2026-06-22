@@ -1,5 +1,5 @@
 use eyre::Result;
-use app::{config::{Config, Node, Server}, config_structs::{NodeBackup, NodeData, NodeSSH}};
+use app::{config::{Config, Node, Server}, config_db::ConfigDb, config_structs::{NodeBackup, NodeData, NodeSSH}};
 use colored::Colorize;
 use eyre::Ok;
 use util::{shell_exec, shell_exec_to_string, stdin, stdin_or_default};
@@ -15,7 +15,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
 
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
     let config = Config::new(&pool);
     let node_id: String;
 

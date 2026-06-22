@@ -1,6 +1,6 @@
 use std::process::exit;
 
-use app::config::{Config, Server};
+use app::{config::Server, config_db::ConfigDb};
 use indexmap::IndexMap;
 use prelude::{SerdeJsonSerialize, SerdeJsonValueSerialize};
 use serde_json::json;
@@ -29,7 +29,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
 
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
 
     let roots = Server::list(&pool).await?;
 

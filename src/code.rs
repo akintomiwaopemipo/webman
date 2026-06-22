@@ -1,6 +1,6 @@
 use eyre::Result;
 
-use app::config::{Config, Node};
+use app::{config::Node, config_db::ConfigDb};
 use util::shell_exec;
 
 
@@ -23,7 +23,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
     
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
     let host: String;
     let default_remote_dir: String;
             

@@ -1,4 +1,4 @@
-use app::config::{Config, Node, Server};
+use app::{config::{Config, Node, Server}, config_db::ConfigDb};
 use eyre::Result;
 use sqlx::SqlitePool;
 
@@ -17,7 +17,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
 
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
 
     let push_to_all_nodes = args.all;
 

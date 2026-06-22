@@ -1,4 +1,4 @@
-use app::config::Config;
+use app::{config::Config, config_db::ConfigDb};
 use prelude::SerdeJsonSerialize;
 use eyre::Result;
 
@@ -12,7 +12,7 @@ pub struct Args{
 
 
 pub async fn action(args: Args) -> Result<()> {
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
     let roots = Config::new(&pool).data().await?.servers;
 
     

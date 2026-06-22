@@ -1,4 +1,4 @@
-use app::config::{Config, Node, Server};
+use app::{config::{Node, Server}, config_db::ConfigDb};
 use eyre::Result;
 use util::shell_exec;
 
@@ -10,7 +10,7 @@ pub struct Args{
 
 
 pub async fn action(args: Args) -> Result<()> {
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
     let node_id = args.node_id;
     let node = Node::new(&node_id, &pool);
     let node_data = node.data().await?;

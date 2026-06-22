@@ -1,4 +1,4 @@
-use app::{config::{Config, Node}, config_structs::NodeData};
+use app::{app::App, config::Node, config_db::ConfigDb, config_structs::NodeData};
 use prelude::SerdeJsonSerialize;
 use util::{file_get_contents, file_put_contents, shell_exec};
 use eyre::Result;
@@ -12,14 +12,14 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
 
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
     let node_id = args.node_id;
     let node = Node::new(&node_id, &pool);
     let node_data = node.data().await?;
 
 
-    let tmp_file = Config::new_tmp_file("json", 7);
-    let new_tmp_file = Config::new_tmp_file("json", 7);
+    let tmp_file = App::new_tmp_file("json", 7);
+    let new_tmp_file = App::new_tmp_file("json", 7);
 
     let mut node_string = node_data.stringify_pretty();
     node_string.push_str("\n");

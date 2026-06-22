@@ -1,4 +1,4 @@
-use app::config::{Config, Node, Server};
+use app::{config::{Node, Server}, config_db::ConfigDb};
 use tokio::fs;
 use util::default_ppk_path;
 use colored::Colorize;
@@ -22,7 +22,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
 
-    let pool = Config::connection_pool().await?;
+    let pool = ConfigDb::connection_pool().await?;
 
     if let Some(context) = args.context{
 
