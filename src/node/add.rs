@@ -1,5 +1,5 @@
 use eyre::Result;
-use app::{config::{Config, Node, Server}, config_db::ConfigDb, config_structs::{NodeBackup, NodeData, NodeSSH}};
+use app::{config::{Config, Node, NodeBackup, NodeData, NodeSsh, Server}, config_db::ConfigDb};
 use colored::Colorize;
 use eyre::Ok;
 use util::{shell_exec, shell_exec_to_string, stdin, stdin_or_default};
@@ -71,12 +71,12 @@ pub async fn action(args: Args) -> Result<()> {
         hostname: None,
         remote_home_dir: None,
         mysql: None,
-        ssh: NodeSSH{
+        ssh: NodeSsh {
             username: ssh_username,
             password: Some(ssh_password),
             private_key: None
         },
-        backup: NodeBackup{
+        backup: NodeBackup {
             bucket: domain_name,
             regulation_range: 10
         },

@@ -1,4 +1,4 @@
-use app::{app::App, config::Node, config_db::ConfigDb, config_structs::NodeData};
+use app::{app::App, config::{Node, NodeData}, config_db::ConfigDb};
 use prelude::SerdeJsonSerialize;
 use util::{file_get_contents, file_put_contents, shell_exec};
 use eyre::Result;
