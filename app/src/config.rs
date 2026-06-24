@@ -374,28 +374,28 @@ impl CustomDomain {
         format!("{SSL_ROOT_PARENT}/{ssl_key}/{domain_name}")
     }
 
-    pub async fn ssl_key_path(&self) -> Result<String> {
+    pub fn ssl_key_path(&self) -> Result<String> {
         let ssl_dir = self.ssl_dir();
         Ok(format!("{ssl_dir}/key.pem"))
     }
 
 
-    pub async fn ssl_cert_path(&self) -> Result<String> {
+    pub fn ssl_cert_path(&self) -> Result<String> {
         let ssl_dir = self.ssl_dir();
         Ok(format!("{ssl_dir}/cert.pem"))
     }
 
 
 
-    pub async fn active_domains_from_cache(nodes: &IndexMap<String, NodeData>) -> Result<Vec<CustomDomainData>> {
+    pub fn active_domains_from_cache(nodes: &IndexMap<String, NodeData>) -> Result<Vec<CustomDomainData>> {
         
         let mut custom_domains = Vec::new();
         
-        for domain in Self::list_from_cache(nodes).await? {
+        for domain in Self::list_from_cache(nodes)? {
 
             let custom_domain = CustomDomain::new(&domain.domain_name, &domain.node_id);
 
-            if domain.active && Path::new(&custom_domain.ssl_key_path().await?).exists() && Path::new(&custom_domain.ssl_cert_path().await?).exists() {
+            if domain.active && Path::new(&custom_domain.ssl_key_path()?).exists() && Path::new(&custom_domain.ssl_cert_path()?).exists() {
                 custom_domains.push(domain);
             }
         }
@@ -405,7 +405,7 @@ impl CustomDomain {
 
 
     
-    pub async fn list_from_cache(nodes: &IndexMap<String, NodeData>) -> Result<Vec<CustomDomainData>> {
+    pub fn list_from_cache(nodes: &IndexMap<String, NodeData>) -> Result<Vec<CustomDomainData>> {
         
         let mut custom_domains = Vec::new();
         
@@ -429,13 +429,13 @@ impl CustomDomain {
 
     pub async fn list(pool: &SqlitePool) -> Result<Vec<CustomDomainData>> {
         let nodes = Node::list(pool).await?;
-        Ok(Self::list_from_cache(&nodes).await?)
+        Ok(Self::list_from_cache(&nodes)?)
     }
 
 
     pub async fn active_domains(pool: &SqlitePool) -> Result<Vec<CustomDomainData>> {
         let nodes = Node::list(pool).await?;
-        Ok(Self::active_domains_from_cache(&nodes).await?)
+        Ok(Self::active_domains_from_cache(&nodes)?)
     }
 
 
