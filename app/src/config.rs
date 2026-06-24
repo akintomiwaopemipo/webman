@@ -343,7 +343,7 @@ impl Node{
 
 
 
-
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CustomDomainData {
     pub domain_name: String,
     pub node_id: String,
