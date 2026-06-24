@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crud::sqlite::Crud;
 use db::entities::{Metadata, Nodes, Servers};
 pub use indexmap::IndexMap;
@@ -10,6 +12,8 @@ use utils::ssh::Session;
 
 
 pub use sqlx::SqlitePool as Pool;
+
+pub const SSL_ROOT_PARENT: &'static str = "/etc/ssl/icitifysms";
 
 
 
@@ -328,6 +332,110 @@ impl Node{
             &node.ssh.username,
             &node.ssh.password.unwrap_or_default(),
         ).await
+    }
+
+
+}
+
+
+
+
+
+
+
+
+pub struct CustomDomainData {
+    pub domain_name: String,
+    pub node_id: String,
+    pub active: bool
+}
+
+
+
+pub struct CustomDomain {
+    pub domain_name: String,
+    pub node_id: String,
+}
+
+
+
+impl CustomDomain {
+
+    pub fn new(domain_name: &str, node_id: &str) -> Self {
+        Self {
+            domain_name: domain_name.into(),
+            node_id: node_id.into()
+        }
+    }
+
+    pub fn ssl_dir(&self) -> String {
+        let ssl_key = &self.node_id[..3];
+        let domain_name = &self.domain_name;
+        format!("{SSL_ROOT_PARENT}/{ssl_key}/{domain_name}")
+    }
+
+    pub async fn ssl_key_path(&self) -> Result<String> {
+        let ssl_dir = self.ssl_dir();
+        Ok(format!("{ssl_dir}/key.pem"))
+    }
+
+
+    pub async fn ssl_cert_path(&self) -> Result<String> {
+        let ssl_dir = self.ssl_dir();
+        Ok(format!("{ssl_dir}/cert.pem"))
+    }
+
+
+
+    pub async fn active_domains_from_cache(nodes: &IndexMap<String, NodeData>) -> Result<Vec<CustomDomainData>> {
+        
+        let mut custom_domains = Vec::new();
+        
+        for domain in Self::list_from_cache(nodes).await? {
+
+            let custom_domain = CustomDomain::new(&domain.domain_name, &domain.node_id);
+
+            if domain.active && Path::new(&custom_domain.ssl_key_path().await?).exists() && Path::new(&custom_domain.ssl_cert_path().await?).exists() {
+                custom_domains.push(domain);
+            }
+        }
+
+        Ok(custom_domains)
+    }
+
+
+    
+    pub async fn list_from_cache(nodes: &IndexMap<String, NodeData>) -> Result<Vec<CustomDomainData>> {
+        
+        let mut custom_domains = Vec::new();
+        
+        for node in nodes.values() {
+
+            if let Some(domain_name) = &node.custom_domain {
+                custom_domains.push(CustomDomainData{
+                    domain_name: domain_name.clone(),
+                    node_id: node.node_id.clone(),
+                    active: node.active
+                });
+            }
+        }
+
+        Ok(custom_domains)
+
+
+    }
+
+
+
+    pub async fn list(pool: &SqlitePool) -> Result<Vec<CustomDomainData>> {
+        let nodes = Node::list(pool).await?;
+        Ok(Self::list_from_cache(&nodes).await?)
+    }
+
+
+    pub async fn active_domains(pool: &SqlitePool) -> Result<Vec<CustomDomainData>> {
+        let nodes = Node::list(pool).await?;
+        Ok(Self::active_domains_from_cache(&nodes).await?)
     }
 
 
