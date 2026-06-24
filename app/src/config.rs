@@ -9,6 +9,9 @@ use db::tables::{ Nodes as DbNodes, Servers as DbServers };
 use utils::ssh::Session;
 
 
+pub use sqlx::SqlitePool as Pool;
+
+
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NodeSsh {
