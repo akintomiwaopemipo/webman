@@ -1,6 +1,6 @@
 use crud::sqlite::Crud;
 use db::entities::{Metadata, Nodes, Servers};
-use indexmap::IndexMap;
+pub use indexmap::IndexMap;
 use prelude::SerdeJsonSerialize;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
