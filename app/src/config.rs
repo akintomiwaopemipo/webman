@@ -348,6 +348,7 @@ pub struct CustomDomainData {
     pub domain_name: String,
     pub node_id: String,
     pub app_id: String,
+    pub ssl_dir: String,
     pub ssl_key_path: Option<String>,
     pub ssl_cert_path: Option<String>,
     pub active: bool
@@ -420,6 +421,7 @@ impl CustomDomain {
                     domain_name: domain_name.clone(),
                     node_id: node.node_id.clone(),
                     app_id: node.app_id.clone(),
+                    ssl_dir: custom_domain.ssl_dir(),
                     ssl_key_path: custom_domain.ssl_key_path().ok(),
                     ssl_cert_path: custom_domain.ssl_cert_path().ok(),
                     active: node.active
