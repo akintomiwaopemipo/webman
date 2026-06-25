@@ -6,7 +6,7 @@ pub use indexmap::IndexMap;
 use prelude::SerdeJsonSerialize;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use eyre::Result;
+use eyre::{Result, eyre};
 use db::tables::{ Nodes as DbNodes, Servers as DbServers };
 use utils::ssh::Session;
 
@@ -325,12 +325,33 @@ impl Node{
     }
 
 
+    pub async fn document_root(&self) -> Result<String> {
+        let config = Config::new(&self.pool);
+        Ok(if let Ok(sites_directory) = config.sites_directory().await {
+            let node_data = self.data().await?;
+            let node_id = node_data.node_id;
+            format!("{sites_directory}/{node_id}")
+        }else {
+            self.remote_node_dir().await?   
+        })
+    }
+
+
     pub async fn ssh(&self) -> Result<Session> {
+        let config = Config::new(&self.pool);
         let node = self.data().await?;
+
+        let (username, password) = if config.is_server_wide().await {
+            let server = Server::new(&node.host, &self.pool).data().await?;
+            (&server.username.clone(), &server.password.clone())
+        } else {
+            (&node.ssh.username, &node.ssh.password.unwrap_or_default())
+        };
+
         Session::connect(
             &node.host,
-            &node.ssh.username,
-            &node.ssh.password.unwrap_or_default(),
+            username,
+            password,
         ).await
     }
 
@@ -570,6 +591,17 @@ impl Config {
 
     pub async fn nodes_config_name(&self) -> Result<String> {
         self.metadata("nodes_config_name").await
+    }
+
+
+    pub async fn sites_directory(&self) -> Result<String> {
+        self.metadata("sites_directory").await.map_err(|e| eyre!("Failed to get sites_directory metadata: {}", e))
+    }
+
+
+    pub async fn is_server_wide(&self) -> bool {
+        let server_wide_metadata = self.metadata("server_wide").await.unwrap_or_default();
+        server_wide_metadata.trim() == "1"
     }
     
     

@@ -63,7 +63,7 @@ async fn push_config(node_id: &str, pool: &SqlitePool) -> Result<()> {
 
     let mut ssh = node.ssh().await?;
 
-    let remote_path = format!("{}/{}.json", node.remote_node_dir().await?, config.nodes_config_name);
+    let remote_path = format!("{}/{}.json", node.document_root().await?, config.nodes_config_name);
     ssh.upload(&remote_path, &fs::read(&tmp_file).await?).await?;
 
     let mut cnf_tmp: Option<String> = None;
