@@ -106,6 +106,9 @@ impl Session {
         contents: &[u8],
     ) -> Result<()> {
 
+        let len = contents.len();
+        println!("local({len} bytes) -> {remote_path}");
+
         let channel = self.session
             .channel_open_session()
             .await?;
