@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use eyre::{Result, bail};
-use russh::{ChannelMsg, client, keys::PublicKey};
+use russh::{ChannelMsg, client, keys::{PrivateKeyWithHashAlg, PublicKey, load_secret_key}};
 use russh_sftp::client::SftpSession;
 use tokio::{io::AsyncWriteExt, sync::mpsc::{Receiver, Sender}};
 
@@ -20,6 +20,7 @@ impl client::Handler for ClientHandler {
 
 pub struct Session {
     session: client::Handle<ClientHandler>,
+    cwd: Option<String>,
 }
 
 impl Session {
@@ -28,6 +29,7 @@ impl Session {
         host: &str,
         username: &str,
         password: &str,
+        cwd: Option<&str>
     ) -> Result<Self> {
 
         let config = Arc::new(client::Config::default());
@@ -49,19 +51,74 @@ impl Session {
 
         Ok(Self {
             session,
+            cwd: cwd.map(|s| s.to_string()),
         })
     }
 
+
+
+    pub async fn connect_with_key<P: AsRef<Path>>(
+        host: &str,
+        username: &str,
+        key_path: P,
+        passphrase: Option<&str>,
+        cwd: Option<&str>,
+    ) -> Result<Self> {
+
+        // Read and parse the private key from the given file path
+        let key_content = std::fs::read_to_string(key_path)?;
+        let key_pair = load_secret_key(&key_content, passphrase)?;
+
+        let config = Arc::new(client::Config::default());
+
+        // Establish connection to the remote server
+        let mut session = client::connect(
+            config,
+            format!("{host}:22"),
+            ClientHandler,
+        )
+        .await?;
+
+        // 2. Query the session for the best supported signature hash (critical for RSA keys)
+        let best_hash = session.best_supported_rsa_hash().await?.flatten();
+
+        // 3. Construct the expected PrivateKeyWithHashAlg wrapper
+        let auth_key = PrivateKeyWithHashAlg::new(Arc::new(key_pair), best_hash);
+
+        // Authenticate using the corrected key signature wrapper
+        if !session
+            .authenticate_publickey(username, auth_key)
+            .await?
+            .success()
+        {
+            bail!("SSH key authentication failed");
+        }
+
+        Ok(Self {
+            session,
+            cwd: cwd.map(|s| s.to_string()),
+        })
+    }
+    
+
+
+
     pub async fn exec(
         &mut self,
-        command: &str,
+        command: &str
     ) -> Result<String> {
 
         let mut channel = self.session
             .channel_open_session()
             .await?;
 
-        channel.exec(true, command).await?;
+        let finalized_command = match &self.cwd {
+            Some(path) => format!("cd {} && {}", path, command),
+            None => command.to_string(),
+        };
+
+        // Fixed: Passed ownership directly instead of using a reference &
+        channel.exec(true, finalized_command).await?;
 
         let mut output = String::new();
 
@@ -101,8 +158,7 @@ impl Session {
     }
 
     
-    
-    pub async fn upload(
+        pub async fn upload(
         &mut self,
         remote_path: &str,
         contents: &[u8],
@@ -125,8 +181,20 @@ impl Session {
         )
         .await?;
 
+        // Resolve the target path based on whether cwd is provided
+        let resolved_path = match &self.cwd {
+            Some(path) => {
+                let mut full_path = std::path::PathBuf::from(path);
+                full_path.push(remote_path);
+                // Convert PathBuf to a lossy String for the SFTP API
+                full_path.to_string_lossy().into_owned()
+            }
+            None => remote_path.to_string(),
+        };
+
+        // Fixed: Use resolved_path instead of the unmapped remote_path
         let mut file = sftp
-            .create(remote_path)
+            .create(resolved_path)
             .await?;
 
         file.write_all(contents).await?;
@@ -137,41 +205,41 @@ impl Session {
 
 
 
-
     pub async fn exec_interactive(
         &mut self,
         command: &str,
     ) -> Result<String> {
-        // 1. Open a standard session channel
         let mut channel = self.session
             .channel_open_session()
             .await?;
 
-        // 2. Request a pseudo-terminal (PTY) to force terminal-style output formatting
         channel
             .request_pty(
                 true,
-                "xterm-256color", // Enables ANSI color codes
-                80,               // Standard terminal column width
-                24,               // Standard terminal row height
+                "xterm-256color",
+                80,
+                24,
                 0,
                 0,
                 &[],
             )
             .await?;
 
-        // 3. Execute the single command under the PTY context
-        channel.exec(true, command).await?;
+        let finalized_command = match &self.cwd {
+            Some(path) => format!("cd {} && {}", path, command),
+            None => command.to_string(),
+        };
+
+        // Fixed: Passed ownership directly instead of using a reference &
+        channel.exec(true, finalized_command).await?;
 
         let mut output = String::new();
 
-        // 4. Stream data until the remote processes exits
         while let Some(msg) = channel.wait().await {
             match msg {
                 ChannelMsg::Data { data } => {
                     output.push_str(&String::from_utf8_lossy(&data));
                 }
-                // Under a PTY, stderr is often multiplexed into stdout (ChannelMsg::Data)
                 ChannelMsg::ExtendedData { data, .. } => {
                     output.push_str(&String::from_utf8_lossy(&data));
                 }
@@ -192,47 +260,43 @@ impl Session {
     }
 
 
-
-
     pub async fn shell(
         &mut self,
         mut stdin_rx: Receiver<String>,
         stdout_tx: Sender<String>,
     ) -> Result<()> {
-        // 1. Open a new session channel
         let mut channel = self.session.channel_open_session().await?;
 
-        // 2. Request a pseudo-terminal (PTY) to emulate a real terminal screen
         channel
             .request_pty(
                 true,
-                "xterm-256color", // Terminal type emulation
-                80,               // Terminal width in characters
-                24,               // Terminal height in characters
-                0,                // Pixel width
-                0,                // Pixel height
-                &[],              // Custom terminal modes (empty defaults)
+                "xterm-256color",
+                80,
+                24,
+                0,
+                0,
+                &[],
             )
             .await?;
 
-        // 3. Start the interactive shell subsystem
         channel.request_shell(true).await?;
 
-        // 4. Split the channel into reading and writing tasks
+        if let Some(path) = &self.cwd {
+            let cd_cmd = format!("cd \"{}\" && clear\n", path);
+            channel.data(cd_cmd.as_bytes()).await?;
+        }
+
         loop {
             tokio::select! {
-                // Handle user inputs sent to stdin_rx
                 input = stdin_rx.recv() => {
                     match input {
                         Some(cmd) => {
-                            // Write command bytes to the remote shell
                             channel.data(cmd.as_bytes()).await?;
                         }
-                        None => break, // Channel closed by local caller
+                        None => break,
                     }
                 }
 
-                // Handle incoming data streams from the remote server
                 msg = channel.wait() => {
                     match msg {
                         Some(ChannelMsg::Data { data }) => {
@@ -248,7 +312,7 @@ impl Session {
                             }
                         }
                         Some(ChannelMsg::ExitStatus { .. }) | None => {
-                            break; // Remote shell exited
+                            break;
                         }
                         _ => {}
                     }
@@ -260,8 +324,6 @@ impl Session {
     }
 
 
-
-
     pub async fn exec_stream_to_stdout(
         &mut self,
         command: &str,
@@ -269,21 +331,26 @@ impl Session {
         let mut channel = self.session.channel_open_session().await?;
 
         channel.request_pty(true, "xterm-256color", 80, 24, 0, 0, &[]).await?;
-        channel.exec(true, command).await?;
+        
+        let finalized_command = match &self.cwd {
+            Some(path) => format!("cd {} && {}", path, command),
+            None => command.to_string(),
+        };
 
-        // Use standard output handle for unbuffered raw byte printing
+        // Fixed: Passed ownership directly instead of using a reference &
+        channel.exec(true, finalized_command).await?;
+
         let mut local_stdout = tokio::io::stdout();
 
         while let Some(msg) = channel.wait().await {
             match msg {
                 ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
-                    // Flush bytes immediately to the screen as they arrive
                     local_stdout.write_all(&data).await?;
                     local_stdout.flush().await?;
                 }
                 ChannelMsg::ExitStatus { exit_status } => {
                     if exit_status != 0 {
-                        bail!("Command exited with status {exit_status}");
+                        bail!("Streaming command failed with exit code {}", exit_status);
                     }
                 }
                 _ => {}
@@ -292,41 +359,4 @@ impl Session {
 
         Ok(())
     }
-
-
-
-    pub async fn exec_stream_to_channel(
-        &mut self,
-        command: &str,
-        tx: Sender<String>,
-    ) -> Result<()> {
-        let mut channel = self.session.channel_open_session().await?;
-
-        channel.request_pty(true, "xterm-256color", 80, 24, 0, 0, &[]).await?;
-        channel.exec(true, command).await?;
-
-        while let Some(msg) = channel.wait().await {
-            match msg {
-                ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
-                    let text = String::from_utf8_lossy(&data).into_owned();
-                    // Send text chunk immediately to the receiver
-                    if tx.send(text).await.is_err() {
-                        break; // Receiver disconnected
-                    }
-                }
-                ChannelMsg::ExitStatus { exit_status } => {
-                    if exit_status != 0 {
-                        bail!("Command exited with status {exit_status}");
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        Ok(())
-    }
-
-
-
-
 }

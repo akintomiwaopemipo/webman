@@ -34,7 +34,7 @@ pub async fn action(args: Args) -> Result<()> {
 
             let password = rpassword::prompt_password("Password: ".bright_cyan()).unwrap();
 
-            let mut ssh = Session::connect(host, username, &password).await?;
+            let mut ssh = Session::connect(host, username, &password, None).await?;
 
 
             let ppk_path = default_ppk_path();

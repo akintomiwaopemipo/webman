@@ -340,6 +340,7 @@ impl Node{
     pub async fn ssh(&self) -> Result<Session> {
         let config = Config::new(&self.pool);
         let node = self.data().await?;
+        let document_root = self.document_root().await?;
 
         let (username, password) = if config.is_server_wide().await {
             let server = Server::new(&node.host, &self.pool).data().await?;
@@ -352,6 +353,7 @@ impl Node{
             &node.host,
             username,
             password,
+            Some(&document_root)
         ).await
     }
 
@@ -527,6 +529,7 @@ impl Server {
             &server.root_ip,
             &server.username,
             &server.password,
+            None
         ).await
     }
 }
