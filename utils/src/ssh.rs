@@ -56,7 +56,6 @@ impl Session {
     }
 
 
-
     pub async fn connect_with_key<P: AsRef<Path>>(
         host: &str,
         username: &str,
@@ -79,10 +78,10 @@ impl Session {
         )
         .await?;
 
-        // 2. Query the session for the best supported signature hash (critical for RSA keys)
+        // Query the session for the best supported signature hash (critical for RSA keys)
         let best_hash = session.best_supported_rsa_hash().await?.flatten();
 
-        // 3. Construct the expected PrivateKeyWithHashAlg wrapper
+        // Construct the expected PrivateKeyWithHashAlg wrapper
         let auth_key = PrivateKeyWithHashAlg::new(Arc::new(key_pair), best_hash);
 
         // Authenticate using the corrected key signature wrapper
@@ -101,8 +100,6 @@ impl Session {
     }
     
 
-
-
     pub async fn exec(
         &mut self,
         command: &str
@@ -117,7 +114,6 @@ impl Session {
             None => command.to_string(),
         };
 
-        // Fixed: Passed ownership directly instead of using a reference &
         channel.exec(true, finalized_command).await?;
 
         let mut output = String::new();
@@ -158,7 +154,7 @@ impl Session {
     }
 
     
-        pub async fn upload(
+    pub async fn upload(
         &mut self,
         remote_path: &str,
         contents: &[u8],
@@ -186,13 +182,11 @@ impl Session {
             Some(path) => {
                 let mut full_path = std::path::PathBuf::from(path);
                 full_path.push(remote_path);
-                // Convert PathBuf to a lossy String for the SFTP API
                 full_path.to_string_lossy().into_owned()
             }
             None => remote_path.to_string(),
         };
 
-        // Fixed: Use resolved_path instead of the unmapped remote_path
         let mut file = sftp
             .create(resolved_path)
             .await?;
@@ -202,7 +196,6 @@ impl Session {
 
         Ok(())
     }
-
 
 
     pub async fn exec_interactive(
@@ -230,7 +223,6 @@ impl Session {
             None => command.to_string(),
         };
 
-        // Fixed: Passed ownership directly instead of using a reference &
         channel.exec(true, finalized_command).await?;
 
         let mut output = String::new();
@@ -264,6 +256,7 @@ impl Session {
         &mut self,
         mut stdin_rx: Receiver<String>,
         stdout_tx: Sender<String>,
+        prompt: Option<&str>, // 1. Added optional prompt customization
     ) -> Result<()> {
         let mut channel = self.session.channel_open_session().await?;
 
@@ -281,11 +274,24 @@ impl Session {
 
         channel.request_shell(true).await?;
 
-        if let Some(path) = &self.cwd {
-            let cd_cmd = format!("cd \"{}\" && clear\n", path);
-            channel.data(cd_cmd.as_bytes()).await?;
+        // 2. Dynamically build the initialization shell configuration script
+        let mut init_script = String::new();
+
+        if let Some(custom_prompt) = prompt {
+            init_script.push_str(&format!("export PS1='{}'\n", custom_prompt));
         }
 
+        if let Some(path) = &self.cwd {
+            init_script.push_str(&format!("cd \"{}\"\n", path));
+        }
+
+        // Clear layout screen buffer to keep custom setup commands hidden from local stdout
+        if !init_script.is_empty() {
+            init_script.push_str("clear\n");
+            channel.data(init_script.as_bytes()).await?;
+        }
+
+        // 3. Process data loop (completed and closed out safely)
         loop {
             tokio::select! {
                 input = stdin_rx.recv() => {
@@ -293,7 +299,7 @@ impl Session {
                         Some(cmd) => {
                             channel.data(cmd.as_bytes()).await?;
                         }
-                        None => break,
+                        None => break, // Local loop transmitter closed
                     }
                 }
 
@@ -312,48 +318,11 @@ impl Session {
                             }
                         }
                         Some(ChannelMsg::ExitStatus { .. }) | None => {
-                            break;
+                            break; // Remote shell instance exited
                         }
                         _ => {}
                     }
                 }
-            }
-        }
-
-        Ok(())
-    }
-
-
-    pub async fn exec_stream_to_stdout(
-        &mut self,
-        command: &str,
-    ) -> Result<()> {
-        let mut channel = self.session.channel_open_session().await?;
-
-        channel.request_pty(true, "xterm-256color", 80, 24, 0, 0, &[]).await?;
-        
-        let finalized_command = match &self.cwd {
-            Some(path) => format!("cd {} && {}", path, command),
-            None => command.to_string(),
-        };
-
-        // Fixed: Passed ownership directly instead of using a reference &
-        channel.exec(true, finalized_command).await?;
-
-        let mut local_stdout = tokio::io::stdout();
-
-        while let Some(msg) = channel.wait().await {
-            match msg {
-                ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
-                    local_stdout.write_all(&data).await?;
-                    local_stdout.flush().await?;
-                }
-                ChannelMsg::ExitStatus { exit_status } => {
-                    if exit_status != 0 {
-                        bail!("Streaming command failed with exit code {}", exit_status);
-                    }
-                }
-                _ => {}
             }
         }
 
