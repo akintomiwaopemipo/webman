@@ -358,6 +358,13 @@ impl Node{
     }
 
 
+    pub async fn server_ssh(&self) -> Result<Session> {
+        let node = self.data().await?;
+        let server = Server::new(&node.host, &self.pool);
+        server.ssh().await
+    }
+
+
 }
 
 
