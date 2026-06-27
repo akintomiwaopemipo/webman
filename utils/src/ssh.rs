@@ -153,49 +153,6 @@ impl Session {
         Ok(output)
     }
 
-    
-    pub async fn upload(
-        &mut self,
-        remote_path: &str,
-        contents: &[u8],
-    ) -> Result<()> {
-
-        let len = contents.len();
-        println!("local({len} bytes) -> {remote_path}");
-
-        let channel = self.session
-            .channel_open_session()
-            .await?;
-
-        channel
-            .request_subsystem(true, "sftp")
-            .await?;
-
-
-        let sftp = SftpSession::new(
-            channel.into_stream()
-        )
-        .await?;
-
-        // Resolve the target path based on whether cwd is provided
-        let resolved_path = match &self.cwd {
-            Some(path) => {
-                let mut full_path = std::path::PathBuf::from(path);
-                full_path.push(remote_path);
-                full_path.to_string_lossy().into_owned()
-            }
-            None => remote_path.to_string(),
-        };
-
-        let mut file = sftp
-            .create(resolved_path)
-            .await?;
-
-        file.write_all(contents).await?;
-        file.flush().await?;
-
-        Ok(())
-    }
 
 
     pub async fn exec_interactive(
@@ -250,6 +207,46 @@ impl Session {
 
         Ok(output)
     }
+
+
+
+
+     pub async fn exec_stream_to_stdout(
+        &mut self,
+        command: &str,
+    ) -> Result<()> {
+        let mut channel = self.session.channel_open_session().await?;
+
+        channel.request_pty(true, "xterm-256color", 80, 24, 0, 0, &[]).await?;
+        
+        let finalized_command = match &self.cwd {
+            Some(path) => format!("cd {} && {}", path, command),
+            None => command.to_string(),
+        };
+
+        // Fixed: Passed ownership directly instead of using a reference &
+        channel.exec(true, finalized_command).await?;
+
+        let mut local_stdout = tokio::io::stdout();
+
+        while let Some(msg) = channel.wait().await {
+            match msg {
+                ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
+                    local_stdout.write_all(&data).await?;
+                    local_stdout.flush().await?;
+                }
+                ChannelMsg::ExitStatus { exit_status } => {
+                    if exit_status != 0 {
+                        bail!("Streaming command failed with exit code {}", exit_status);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+    
 
 
     pub async fn shell(
@@ -328,4 +325,51 @@ impl Session {
 
         Ok(())
     }
+
+
+
+    pub async fn upload(
+        &mut self,
+        remote_path: &str,
+        contents: &[u8],
+    ) -> Result<()> {
+
+        let len = contents.len();
+        println!("local({len} bytes) -> {remote_path}");
+
+        let channel = self.session
+            .channel_open_session()
+            .await?;
+
+        channel
+            .request_subsystem(true, "sftp")
+            .await?;
+
+
+        let sftp = SftpSession::new(
+            channel.into_stream()
+        )
+        .await?;
+
+        // Resolve the target path based on whether cwd is provided
+        let resolved_path = match &self.cwd {
+            Some(path) => {
+                let mut full_path = std::path::PathBuf::from(path);
+                full_path.push(remote_path);
+                full_path.to_string_lossy().into_owned()
+            }
+            None => remote_path.to_string(),
+        };
+
+        let mut file = sftp
+            .create(resolved_path)
+            .await?;
+
+        file.write_all(contents).await?;
+        file.flush().await?;
+
+        Ok(())
+    }
+
+
 }
