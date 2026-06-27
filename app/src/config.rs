@@ -579,8 +579,12 @@ impl Config {
     
 
     pub async fn nodes(&self) -> Result<IndexMap<String, NodeData>> {
-        let config = self.data().await?;
-        Ok(config.nodes)
+        Ok(Node::list(&self.pool).await?)
+    }
+
+
+    pub async fn servers(&self) -> Result<IndexMap<String, ServerData>> {
+        Ok(Server::list(&self.pool).await?)
     }
 
 
@@ -609,7 +613,7 @@ impl Config {
     
     
     pub async fn node_ids(&self) -> Result<Vec<String>>{
-        Ok(util::indexmap_keys(self.data().await?.nodes))
+        Ok(util::indexmap_keys(Node::list(&self.pool).await?))
     }
     
     
