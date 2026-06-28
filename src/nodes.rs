@@ -72,7 +72,7 @@ pub async fn action(args: Args) -> Result<()> {
                 name = node.name,
                 host = node.host,
                 node_url = node.node_url,
-                custom_domain = node.custom_domain.as_ref().map_or("None", |cd| &cd)
+                custom_domain = node.custom_domain.map_or_else(|| "None".to_string(), |cd| format!("https://{cd}"))
             );
         }
 
