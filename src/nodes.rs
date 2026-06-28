@@ -49,9 +49,11 @@ pub async fn action(args: Args) -> Result<()> {
             _table.push(vec![
                 (index + 1).to_string(),
                 node_id.to_owned(),
+                node.app_id,
                 node.name,
                 node.host,
-                node.node_url
+                node.node_url,
+                node.custom_domain.map_or_else(|| "None".to_string(), |cd| format!("https://{cd}"))
             ]);
         }
 
@@ -59,9 +61,11 @@ pub async fn action(args: Args) -> Result<()> {
         print_stdout(_table.clone().table().title(vec![
             "S/N",
             "Node ID",
+            "App ID",
             "Name",
             "Host",
-            "Node Url"
+            "Node Url",
+            "Custom Domain"
         ])).unwrap();
         println!();
 
