@@ -3,7 +3,7 @@ use eyre::Result;
 
 mod node;
 mod nodes;
-mod roots;
+mod servers;
 mod db;
 mod devserver;
 mod code;
@@ -35,8 +35,8 @@ enum Commands {
     #[command(about = "Manage nodes")]
     Nodes(nodes::Args),
 
-    #[command(about = "Manage roots")]
-    Roots(roots::Args),
+    #[command(about = "Manage servers")]
+    Servers(servers::Args),
 
     #[command(about = "Manage SQLite database and generate models")]
     Db(db::Args),
@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
 
         Commands::Nodes(args) => nodes::action(args).await?,
 
-        Commands::Roots(args) => roots::action(args).await?,
+        Commands::Servers(args) => servers::action(args).await?,
 
         Commands::Db(args) => db::action(args).await?,
 

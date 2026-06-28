@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use db::entities::Nodes;
 use eyre::Result;
 use app::{config::{Node, NodeBackup, NodeData, NodeSsh, Server}, config_db::ConfigDb};
@@ -15,14 +17,29 @@ pub struct Args;
 
 pub async fn action(_args: Args) -> Result<()> {
 
+    println!("Pulling latest changes from git...");
     Cmd::exec(Command::new("git").arg("pull")).await?;
+
+    println!();
 
     let pool = ConfigDb::connection_pool().await?;
 
     let node_id = db::unique_hex(Nodes::Table, Nodes::NodeId, 8, &pool).await;
     let app_id = stdin("App ID: ");
-    let domain_name = stdin_or_default("Domain name: ", &format!("{app_id}.icitifysms.com"));
+    
+    if Node::app_id_exists(&app_id, &pool).await {
+        println!("App ID {app_id} already exists. Please choose a different App ID.");
+        exit(1);
+    }
+    
+    let domain_name = format!("{app_id}.icitifysms.com");
     let host = stdin("Host (IP Address): ");
+
+    if !Server::exists(&host, &pool).await {
+        println!("Server with IP {host} does not exist.");
+        exit(1);
+    }
+
     let name = stdin_or_default("Name", &app_id);
     
     let home = {
@@ -74,7 +91,7 @@ pub async fn action(_args: Args) -> Result<()> {
     node_data.pretty_print();
     println!();
 
-    if stdin("Do you want to continue with the above configuration: ").to_lowercase() != "y"{
+    if stdin("Do you want to continue with the above configuration (Y/N): ").to_lowercase() != "y"{
         println!();
         std::process::exit(0);
     }
@@ -84,20 +101,23 @@ pub async fn action(_args: Args) -> Result<()> {
 
     let node = Node::new(&node_id, &pool);
 
-    Cmd::exec(Command::new("git").args(&["commit", "-m", &format!("Add node {node_id}, app_id: {app_id}, name: {name}")])).await?;
+    Cmd::exec(Command::new("git").args(&["commit", "-am", &format!("Add node {node_id}, app_id: {app_id}, name: {name}")])).await?;
 
     Cmd::exec(Command::new("git").arg("push")).await?;
 
     node.push().await?;
     
-    let mut ssh = node.ssh().await?;
+    let mut node_ssh = node.ssh().await?;
+    let mut server_ssh = node.server().await?.ssh().await?;
     let mut central_server_ssh = Server::central_server(&pool).await?.ssh().await?;
 
     central_server_ssh.exec_stream_to_stdout(&format!("icitifysms-central node legacy-php configure {node_id}")).await?;
 
-    ssh.exec(&format!(r#"systemctl restart icitifysms-webserver && echo "Restarted Icitifysms Webserver" "#)).await?;
+    server_ssh.exec(&format!(r#"systemctl restart icitifysms-webserver && echo "Restarted Icitifysms Webserver" "#)).await?;
 
-     ssh.exec("icitifysms setup 2>&1").await?;
+    central_server_ssh.exec("icitifysms-central reload-proxy").await?;
+
+    node_ssh.exec("icitifysms setup 2>&1").await?;
 
     println!("Node successfully added. Node Url: {}", node_data.node_url);
     println!();

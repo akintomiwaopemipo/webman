@@ -375,10 +375,17 @@ impl Node{
     }
 
 
-    pub async fn server_ssh(&self) -> Result<Session> {
+    pub async fn server(&self) -> Result<Server> {
         let node = self.data().await?;
-        let server = Server::new(&node.host, &self.pool);
-        server.ssh().await
+        Ok(Server::new(&node.host, &self.pool))
+    }
+
+
+
+    pub async fn app_id_exists(app_id: &str, pool: &SqlitePool) -> bool {
+        Crud::new(Nodes::Table, pool)
+            .set_column(Nodes::AppId, app_id.into())
+            .exists().await
     }
 
 
@@ -570,7 +577,7 @@ impl Server {
         let (ip, ) = Crud::new(Servers::Table, pool)
             .add_expression(Expr::col(Servers::Hostname).like("%central.%"))
             .select_column(Servers::Ip)
-            .fetch_one::<(String,)>().await?;
+            .fetch_one::<(String,)>().await.map_err(|_| eyre!("Could not fetch central server"))?;
         Ok(Self::new(&ip, pool))
     }
 
@@ -580,11 +587,16 @@ impl Server {
         let (ip, ) = Crud::new(Servers::Table, pool)
             .add_expression(Expr::col(Servers::Hostname).like("%devserver.%"))
             .select_column(Servers::Ip)
-            .fetch_one::<(String,)>().await?;
+            .fetch_one::<(String,)>().await.map_err(|_| eyre!("Could not fetch devserver"))?;
         Ok(Self::new(&ip, pool))
     }
 
 
+    pub async fn exists(ip: &str, pool: &SqlitePool) -> bool {
+        Crud::new(Servers::Table, pool)
+            .set_column(Servers::Ip, ip.into())
+            .exists().await
+    }
 
     pub async fn list(pool: &SqlitePool) -> Result<IndexMap<String, ServerData>> {
         let mut servers = IndexMap::new();
