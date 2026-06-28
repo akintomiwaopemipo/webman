@@ -92,8 +92,7 @@ impl Session {
             Some(path) => path.as_ref().to_path_buf(),
             None => Self::default_private_key()?,
         };
-        let key_content = std::fs::read_to_string(key_path)?;
-        let key_pair = load_secret_key(&key_content, passphrase)?;
+        let key_pair = load_secret_key(&key_path, passphrase)?;
 
         let config = Arc::new(client::Config::default());
 
