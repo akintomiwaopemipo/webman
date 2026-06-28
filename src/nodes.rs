@@ -68,10 +68,11 @@ pub async fn action(args: Args) -> Result<()> {
     } else {
 
         for (node_id, node) in nodes{
-            println!("Node Id: {node_id}, Name: {name}, Host: {host}, Node Url: {node_url} ",
+            println!("Node Id: {node_id}, Name: {name}, Host: {host}, Node Url: {node_url}, Custom Domain: {custom_domain}",
                 name = node.name,
                 host = node.host,
-                node_url = node.node_url
+                node_url = node.node_url,
+                custom_domain = node.custom_domain.as_ref().map_or("None", |cd| &cd)
             );
         }
 

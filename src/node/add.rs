@@ -2,7 +2,7 @@ use std::process::exit;
 
 use db::entities::Nodes;
 use eyre::Result;
-use app::{config::{Node, NodeBackup, NodeData, NodeSsh, Server}, config_db::ConfigDb};
+use app::{config::{Node, NodeBackup, NodeData, NodeMySql, NodeSsh, Server}, config_db::ConfigDb};
 use eyre::Ok;
 use prelude::SerdeJsonSerialize;
 use tokio::process::Command;
@@ -54,6 +54,14 @@ pub async fn action(_args: Args) -> Result<()> {
     if !ssh_username.trim().is_empty(){
         ssh_password = random_characters(21);     
     }
+
+
+    let mysql = NodeMySql {
+        username: Some(app_id.clone()),
+        password: Some(random_characters(21)),
+        database: Some(app_id.clone()),
+        databases: None,
+    };
    
 
     let node_data = NodeData {
@@ -69,7 +77,7 @@ pub async fn action(_args: Args) -> Result<()> {
         home,
         hostname: None,
         remote_home_dir: None,
-        mysql: None,
+        mysql: Some(mysql),
         ssh: NodeSsh {
             username: ssh_username,
             password: Some(ssh_password),
@@ -120,7 +128,7 @@ pub async fn action(_args: Args) -> Result<()> {
     central_server_ssh.exec("icitifysms-central reload-proxy").await?;
 
     println!("Setting up Icitifysms on node");
-    node_ssh.exec_stream_to_stdout("icitifysms setup 2>&1").await?;
+    node_ssh.exec_stream_to_stdout("icitifysms setup").await?;
 
     println!("Node successfully added. Node Url: {}", node_data.node_url);
     println!();

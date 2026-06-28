@@ -40,7 +40,6 @@ pub struct NodeMySql {
     
     pub databases: Option<Vec<String>>,
 
-    pub phpmyadmin_auth_key: Option<String>
 }
 
 
@@ -399,17 +398,6 @@ impl Node{
 
         let remote_path = format!("{}/{}.json", self.document_root().await?, config.nodes_config_name);
         ssh.upload(&remote_path, &node_data.stringify().as_bytes()).await?;
-
-
-
-        if let Some(mysql) = node_data.mysql.clone() {
-
-            ssh.upload(
-                &format!("{}/.my.cnf", self.remote_dir().await?),
-                format!("[client]\nuser = {}\npassword = {}\n", mysql.username.unwrap_or(node_data.ssh.username.clone()), mysql.password.unwrap_or(node_data.ssh.password.clone().unwrap_or_default())).as_bytes()
-            ).await?;
-
-        }
 
         println!();
 
