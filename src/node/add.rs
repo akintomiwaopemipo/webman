@@ -120,7 +120,7 @@ pub async fn action(_args: Args) -> Result<()> {
     central_server_ssh.exec("icitifysms-central reload-proxy").await?;
 
     println!("Setting up Icitifysms on node");
-    node_ssh.exec("icitifysms setup 2>&1").await?;
+    node_ssh.exec_stream_to_stdout("icitifysms setup 2>&1").await?;
 
     println!("Node successfully added. Node Url: {}", node_data.node_url);
     println!();
