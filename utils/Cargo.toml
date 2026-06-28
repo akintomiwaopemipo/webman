@@ -15,3 +15,4 @@ regex = { workspace = true }
 rand = { workspace = true }
 russh = { workspace = true }
 russh-sftp = { workspace = true }
+home = { workspace = true }

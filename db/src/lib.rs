@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use sea_query::Iden;
 use serde_json::json;
 use sqlx::{mysql::MySqlRow , SqlitePool, Row, Column};
-use utils::{random_characters, random_digits};
+use utils::{random_characters, random_digits, random_hex};
 use eyre::Result;
 
 pub mod generate_models;
@@ -29,7 +29,8 @@ pub struct ColumnStructure {
 #[derive(PartialEq)]
 pub enum RandomFromDbContext{
     Digits,
-    Characters
+    Characters,
+    Hex,
 }
 
 
@@ -92,26 +93,38 @@ pub fn rows_to_json_values(row: Vec<MySqlRow>) -> Vec<serde_json::Value>{
 
 
 
-pub async fn unique_from_db<T: Iden>(table_name: T, column_name: T, length: usize, pool: &SqlitePool, context: RandomFromDbContext)->String{
+pub async fn unique_from_db<T: Iden>(
+    table_name: T,
+    column_name: T,
+    length: usize,
+    pool: &SqlitePool,
+    context: RandomFromDbContext,
+) -> String {
+    let table = table_name.to_string();
+    let column = column_name.to_string();
 
-    loop{
+    let sql = format!(
+        "SELECT EXISTS(SELECT 1 FROM `{}` WHERE `{}` = ?)",
+        table, column
+    );
 
-        let content = match context{
+    loop {
+        let value = match context {
             RandomFromDbContext::Digits => random_digits(length),
-            RandomFromDbContext::Characters => random_characters(length)
+            RandomFromDbContext::Characters => random_characters(length),
+            RandomFromDbContext::Hex => random_hex(length),
         };
 
+        let exists: i64 = sqlx::query_scalar(&sql)
+            .bind(&value)
+            .fetch_one(pool)
+            .await
+            .unwrap();
 
-        let rows = sqlx::query(&format!("SELECT * FROM `{}` WHERE `{}` = ?", table_name.to_string(), column_name.to_string()))
-            .bind(content.clone())
-            .fetch_all(pool)
-            .await.unwrap();
-
-        if rows.len() == 0{
-            return content;
+        if exists == 0 {
+            return value;
         }
     }
-    
 }
 
 
@@ -124,6 +137,11 @@ pub async fn unique_digits<T: Iden>(table_name: T, column_name: T, length: usize
 
 pub async fn unique_characters<T: Iden>(table_name: T, column_name: T, length: usize, pool: &SqlitePool)->String{
     unique_from_db(table_name, column_name, length, pool, RandomFromDbContext::Characters).await
+}
+
+
+pub async fn unique_hex<T: Iden>(table_name: T, column_name: T, length: usize, pool: &SqlitePool)->String{
+    unique_from_db(table_name, column_name, length, pool, RandomFromDbContext::Hex).await
 }
 
 

@@ -153,9 +153,12 @@ dependencies = [
  "indexmap 1.9.3",
  "prelude",
  "russh",
+ "sea-query",
+ "sea-query-binder",
  "serde",
  "serde_json",
  "sqlx",
+ "tokio 1.52.3",
  "util",
  "utils",
  "whoami",
@@ -5086,6 +5089,7 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "eyre",
+ "home",
  "indexmap 1.9.3",
  "prelude",
  "rand 0.7.3",

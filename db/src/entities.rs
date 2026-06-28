@@ -60,11 +60,12 @@ pub enum Nodes {
 pub enum Servers {
     Table,
     Id,
-    RootIp,
+    Ip,
     Username,
     Password,
     Hostname,
     Provider,
+    KeyPath,
 }
 
 

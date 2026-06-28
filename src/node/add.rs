@@ -1,73 +1,55 @@
+use db::entities::Nodes;
 use eyre::Result;
-use app::{config::{Config, Node, NodeBackup, NodeData, NodeSsh, Server}, config_db::ConfigDb};
-use colored::Colorize;
+use app::{config::{Node, NodeBackup, NodeData, NodeSsh, Server}, config_db::ConfigDb};
 use eyre::Ok;
-use util::{shell_exec, shell_exec_to_string, stdin, stdin_or_default};
+use prelude::SerdeJsonSerialize;
+use tokio::process::Command;
+use util::{stdin, stdin_or_default};
+use utils::{cmd::Cmd, random_characters};
 
 
 
 #[derive(clap::Args)]
-pub struct Args{
-    #[arg(long)]
-    no_dns_check: bool
-}
+pub struct Args;
 
 
-pub async fn action(args: Args) -> Result<()> {
+pub async fn action(_args: Args) -> Result<()> {
+
+    Cmd::exec(Command::new("git").arg("pull")).await?;
 
     let pool = ConfigDb::connection_pool().await?;
-    let config = Config::new(&pool);
-    let node_id: String;
 
-    loop{
-        let random_hex = util::random_hex(8);
-        if random_hex.chars().nth(0).unwrap().is_alphabetic(){
-            if !config.node_ids().await?.contains(&random_hex){
-                node_id = random_hex;
-                break;
-            }
-        }
-    }
-
-
-    let mut config_data = config.data().await?;
-
-    // let last_node = config.nodes.clone().into_iter().last().unwrap().1;
-
+    let node_id = db::unique_hex(Nodes::Table, Nodes::NodeId, 8, &pool).await;
     let app_id = stdin("App ID: ");
     let domain_name = stdin_or_default("Domain name: ", &format!("{app_id}.icitifysms.com"));
-    let resolved_host_output= shell_exec_to_string(&format!("dig +short '{domain_name}' | head -n 1"));
-    let mut resolved_host= resolved_host_output.trim();
-    if !args.no_dns_check{
-        if resolved_host.is_empty(){
-            println!("{}", format!("Could not resolve domain: {domain_name}").bright_red());
-            println!();
-            std::process::exit(1);
-        }
-    }else{
-        resolved_host = "";
+    let host = stdin("Host (IP Address): ");
+    let name = stdin_or_default("Name", &app_id);
+    
+    let home = {
+        let home = stdin("Home: ");
+        let home = home.trim().to_owned();
+        (!home.is_empty()).then_some(home)
+    };
+    
+    let ssh_username = stdin("SSH Username: ");
+    let mut ssh_password = "".to_string();
+
+    if !ssh_username.trim().is_empty(){
+        ssh_password = random_characters(21);     
     }
-    
-    let name = util::stdin_or_default("Name", &domain_name);
-    let host = util::stdin_or_default("Host", &resolved_host);
-    let ssh_username = util::stdin_or_default("SSH Username", &domain_name);
-    let ssh_password = util::random_characters(21);
-    let home = format!("/home/{ssh_username}/public_html");
+   
 
-
-    
-
-    config_data.nodes.insert(node_id.clone(), NodeData {
+    let node_data = NodeData {
         node_id: node_id.clone(),
-        name,
-        app_id,
+        name: name.clone(),
+        app_id: app_id.clone(),
         domain_name: domain_name.clone(),
         custom_domain: None,
         host,
         base_url: Some(format!("https://{domain_name}")),
         rel_dirname: Some("".to_string()),
         node_url: format!("https://{domain_name}"),
-        home: Some(home),
+        home,
         hostname: None,
         remote_home_dir: None,
         mysql: None,
@@ -84,14 +66,12 @@ pub async fn action(args: Args) -> Result<()> {
         mimics: None,
         dev_mode: false,
         active: true
-    });
+    };
 
-
-    let (node_id, node) = config_data.nodes.clone().into_iter().last().unwrap();
 
     println!();
     println!("Node Id: {node_id}");
-    println!("{}", util::json_stringify_pretty(node.clone()));
+    node_data.pretty_print();
     println!();
 
     if stdin("Do you want to continue with the above configuration: ").to_lowercase() != "y"{
@@ -100,28 +80,26 @@ pub async fn action(args: Args) -> Result<()> {
     }
 
 
-    Node::add(node.clone(), &pool).await?;
+    Node::add(node_data.clone(), &pool).await?;
+
+    let node = Node::new(&node_id, &pool);
+
+    Cmd::exec(Command::new("git").args(&["commit", "-m", &format!("Add node {node_id}, app_id: {app_id}, name: {name}")])).await?;
+
+    Cmd::exec(Command::new("git").arg("push")).await?;
+
+    node.push().await?;
     
-    let mut ssh = Server::new(&node.host, &pool).ssh().await?;
+    let mut ssh = node.ssh().await?;
+    let mut central_server_ssh = Server::central_server(&pool).await?.ssh().await?;
 
-    
-    let ssh_username = node.ssh.username;
-    let ssh_password = node.ssh.password.unwrap();
-    let domain_name = node.domain_name;
+    central_server_ssh.exec_stream_to_stdout(&format!("icitifysms-central node legacy-php configure {node_id}")).await?;
 
-    ssh.exec(&format!(r#"lemp config server-block --add-unix-user --use-certbot -u {ssh_username} -d "{domain_name}" -p "{ssh_password}""#)).await?;
+    ssh.exec(&format!(r#"systemctl restart icitifysms-webserver && echo "Restarted Icitifysms Webserver" "#)).await?;
 
-    ssh.exec(&format!(r#"portal-server config server-block -u {ssh_username} -d "{domain_name}" -n {node_id}"#)).await?;
+     ssh.exec("icitifysms setup 2>&1").await?;
 
-    shell_exec(&format!("webman push config {node_id}"));
-
-    ssh.exec(&format!(r#"systemctl restart portal-webserver && echo "Restarted Portal Webserver" "#)).await?;
-
-    let mut ssh = Node::new(&node_id, &pool).ssh().await?;
-
-    ssh.exec("cd public_html && portal setup 2>&1").await?;
-
-    println!("Node successfully added. Node Url: {}", node.node_url);
+    println!("Node successfully added. Node Url: {}", node_data.node_url);
     println!();
 
 

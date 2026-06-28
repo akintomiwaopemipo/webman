@@ -1,6 +1,7 @@
-use std::{path::Path, sync::Arc};
+use std::{path::{Path, PathBuf}, sync::Arc};
 
-use eyre::{Result, bail};
+use eyre::{Result, bail, eyre};
+use home::home_dir;
 use russh::{ChannelMsg, client, keys::{PrivateKeyWithHashAlg, PublicKey, load_secret_key}};
 use russh_sftp::client::SftpSession;
 use tokio::{io::AsyncWriteExt, sync::mpsc::{Receiver, Sender}};
@@ -56,15 +57,41 @@ impl Session {
     }
 
 
+
+    pub fn default_private_key() -> Result<PathBuf> {
+        let ssh_dir = home_dir()
+            .ok_or_else(|| eyre!("Could not find home directory"))?
+            .join(".ssh");
+
+        for name in [
+            "id_ed25519",
+            "id_ecdsa",
+            "id_rsa",
+            "id_dsa",
+        ] {
+            let path = ssh_dir.join(name);
+            if path.is_file() {
+                return Ok(path);
+            }
+        }
+
+        bail!("No default SSH private key found in {}", ssh_dir.display())
+    }
+
+
     pub async fn connect_with_key<P: AsRef<Path>>(
         host: &str,
         username: &str,
-        key_path: P,
+        key_path: Option<P>,
         passphrase: Option<&str>,
         cwd: Option<&str>,
     ) -> Result<Self> {
 
         // Read and parse the private key from the given file path
+        let key_path = match key_path {
+            Some(path) => path.as_ref().to_path_buf(),
+            None => Self::default_private_key()?,
+        };
         let key_content = std::fs::read_to_string(key_path)?;
         let key_pair = load_secret_key(&key_content, passphrase)?;
 
@@ -333,7 +360,7 @@ impl Session {
         remote_path: &str,
         contents: &[u8],
     ) -> Result<()> {
-
+        
         let len = contents.len();
         println!("local({len} bytes) -> {remote_path}");
 
@@ -345,7 +372,6 @@ impl Session {
             .request_subsystem(true, "sftp")
             .await?;
 
-
         let sftp = SftpSession::new(
             channel.into_stream()
         )
@@ -356,13 +382,23 @@ impl Session {
             Some(path) => {
                 let mut full_path = std::path::PathBuf::from(path);
                 full_path.push(remote_path);
-                full_path.to_string_lossy().into_owned()
+                full_path
             }
-            None => remote_path.to_string(),
+            None => std::path::PathBuf::from(remote_path),
         };
 
+        // Extract the parent directory and create it if it exists
+        if let Some(parent) = resolved_path.parent() {
+            if parent.as_os_str() != "" {
+                // Note: If your SFTP crate supports recursive creation (like mkdir_p), use that.
+                // Otherwise, this creates a single level.
+                let _ = sftp.create_dir(parent.to_string_lossy().into_owned()).await; 
+            }
+        }
+
+        // Create and write the file
         let mut file = sftp
-            .create(resolved_path)
+            .create(resolved_path.to_string_lossy().into_owned())
             .await?;
 
         file.write_all(contents).await?;
@@ -370,6 +406,7 @@ impl Session {
 
         Ok(())
     }
+
 
 
 }

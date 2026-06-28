@@ -43,6 +43,7 @@ whoami = "1.4.0"
 fs_extra = "1.2.0"
 russh = "0.61.2"
 russh-sftp = "2.3.0"
+home = "0.5.12"
 
 
 

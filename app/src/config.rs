@@ -4,6 +4,7 @@ use crud::sqlite::Crud;
 use db::entities::{Metadata, Nodes, Servers};
 pub use indexmap::IndexMap;
 use prelude::SerdeJsonSerialize;
+use sea_query::Expr;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use eyre::{Result, eyre};
@@ -102,11 +103,13 @@ pub struct NodeData {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ServerData {
 
-    pub root_ip: String,
+    pub ip: String,
 
     pub username: String,
 
-    pub password: String,
+    pub password: Option<String>,
+
+    pub key_path: Option<String>,
 
     pub hostname: String,
 
@@ -342,19 +345,33 @@ impl Node{
         let node = self.data().await?;
         let document_root = self.document_root().await?;
 
-        let (username, password) = if config.is_server_wide().await {
+        if config.is_server_wide().await {
             let server = Server::new(&node.host, &self.pool).data().await?;
-            (&server.username.clone(), &server.password.clone())
+            
+            if let Some(password) = server.password.clone() {
+                Session::connect(
+                    &server.ip,
+                    &server.username,
+                    &password,
+                    Some(&document_root)
+                ).await
+            } else {
+                Session::connect_with_key(
+                    &server.ip,
+                    &server.username,
+                    server.key_path,
+                    None,
+                    Some(&document_root)
+                ).await
+            }
         } else {
-            (&node.ssh.username, &node.ssh.password.unwrap_or_default())
-        };
-
-        Session::connect(
-            &node.host,
-            username,
-            password,
-            Some(&document_root)
-        ).await
+            Session::connect(
+                &node.host,
+                &node.ssh.username,
+                &node.ssh.password.unwrap_or_default(),
+                Some(&document_root)
+            ).await
+        }
     }
 
 
@@ -362,6 +379,34 @@ impl Node{
         let node = self.data().await?;
         let server = Server::new(&node.host, &self.pool);
         server.ssh().await
+    }
+
+
+
+    pub async fn push(&self) -> Result<()> {
+
+        let config = Config::new(&self.pool).data().await?;
+
+        let node_data = self.data().await?;
+        let mut ssh = self.ssh().await?;
+
+        let remote_path = format!("{}/{}.json", self.document_root().await?, config.nodes_config_name);
+        ssh.upload(&remote_path, &node_data.stringify().as_bytes()).await?;
+
+
+
+        if let Some(mysql) = node_data.mysql.clone() {
+
+            ssh.upload(
+                &format!("{}/.my.cnf", self.remote_dir().await?),
+                format!("[client]\nuser = {}\npassword = {}\n", mysql.username.unwrap_or(node_data.ssh.username.clone()), mysql.password.unwrap_or(node_data.ssh.password.clone().unwrap_or_default())).as_bytes()
+            ).await?;
+
+        }
+
+        println!();
+
+        Ok(())
     }
 
 
@@ -484,16 +529,16 @@ impl CustomDomain {
 
 
 pub struct Server {
-    pub root_ip: String,
+    pub ip: String,
     pool: SqlitePool,
 }
 
 
 impl Server {
 
-     pub fn new(root_ip: &str, pool: &SqlitePool) -> Self {
+     pub fn new(ip: &str, pool: &SqlitePool) -> Self {
         Self {
-            root_ip: root_ip.into(),
+            ip: ip.into(),
             pool: pool.clone()
         }
     }
@@ -502,7 +547,7 @@ impl Server {
 
     pub async fn data(&self) -> Result<ServerData> {
         let db_row = Crud::new(Servers::Table, &self.pool)
-            .set_column(Servers::RootIp, self.root_ip.clone().into())
+            .set_column(Servers::Ip, self.ip.clone().into())
             .fetch_one::<DbServers>().await?;
         Ok(Self::from_db_row(db_row)?)
     }
@@ -511,20 +556,41 @@ impl Server {
 
     pub fn from_db_row(row: DbServers) -> Result<ServerData> {
         Ok(ServerData {
-            root_ip: row.root_ip,
+            ip: row.ip,
             username: row.username,
             password: row.password,
+            key_path: row.key_path,
             hostname: row.hostname.unwrap_or_default(),
             provider: row.provider.unwrap_or_default(),
         })
     }
 
 
+    pub async fn central_server(pool: &SqlitePool) -> Result<Self> {
+        let (ip, ) = Crud::new(Servers::Table, pool)
+            .add_expression(Expr::col(Servers::Hostname).like("%central.%"))
+            .select_column(Servers::Ip)
+            .fetch_one::<(String,)>().await?;
+        Ok(Self::new(&ip, pool))
+    }
+
+
+
+    pub async fn devserver(pool: &SqlitePool) -> Result<Self> {
+        let (ip, ) = Crud::new(Servers::Table, pool)
+            .add_expression(Expr::col(Servers::Hostname).like("%devserver.%"))
+            .select_column(Servers::Ip)
+            .fetch_one::<(String,)>().await?;
+        Ok(Self::new(&ip, pool))
+    }
+
+
+
     pub async fn list(pool: &SqlitePool) -> Result<IndexMap<String, ServerData>> {
         let mut servers = IndexMap::new();
         for row in Crud::new(Servers::Table, pool).fetch().await?{
             let server = Self::from_db_row(row)?;
-            servers.insert(server.root_ip.clone(), server);
+            servers.insert(server.ip.clone(), server);
         }
         Ok(servers)
     }
@@ -532,12 +598,23 @@ impl Server {
 
     pub async fn ssh(&self) -> Result<Session> {
         let server = self.data().await?;
-        Session::connect(
-            &server.root_ip,
-            &server.username,
-            &server.password,
-            None
-        ).await
+        
+        if let Some(password) = server.password {
+            Session::connect(
+                &server.ip,
+                &server.username,
+                &password,
+                None
+            ).await
+        } else {
+            Session::connect_with_key(
+                &server.ip,
+                &server.username,
+                server.key_path,
+                None,
+                None
+            ).await
+        }
     }
 }
 

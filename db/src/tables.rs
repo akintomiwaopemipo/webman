@@ -51,10 +51,11 @@ pub struct Nodes {
 #[derive(Serialize, Deserialize, ToSchema, FromRow, Clone, Default)]
 pub struct Servers {
     pub id: i32,
-    pub root_ip: String,
+    pub ip: String,
     pub username: String,
-    pub password: String,
+    pub password: Option<String>,
     pub hostname: Option<String>,
     pub provider: Option<String>,
+    pub key_path: Option<String>,
 }
 
