@@ -113,10 +113,13 @@ pub async fn action(_args: Args) -> Result<()> {
 
     central_server_ssh.exec_stream_to_stdout(&format!("icitifysms-central node legacy-php configure {node_id}")).await?;
 
+    println!("Restarting Icitifysms Webserver");
     server_ssh.exec(&format!(r#"systemctl restart icitifysms-webserver && echo "Restarted Icitifysms Webserver" "#)).await?;
 
+    println!("Reloading Icitifysms Central Proxy");
     central_server_ssh.exec("icitifysms-central reload-proxy").await?;
 
+    println!("Setting up Icitifysms on node");
     node_ssh.exec("icitifysms setup 2>&1").await?;
 
     println!("Node successfully added. Node Url: {}", node_data.node_url);
