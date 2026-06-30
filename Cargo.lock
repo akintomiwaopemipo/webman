@@ -148,6 +148,7 @@ version = "0.1.0"
 dependencies = [
  "crud",
  "db",
+ "dirs 6.0.0",
  "eyre",
  "fs_extra",
  "indexmap 1.9.3",

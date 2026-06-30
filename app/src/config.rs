@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crud::sqlite::Crud;
 use db::entities::{Metadata, Nodes, Servers};
@@ -7,12 +7,15 @@ use prelude::SerdeJsonSerialize;
 use sea_query::Expr;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use eyre::{Result, eyre};
+use eyre::{Result, bail, eyre};
 use db::tables::{ Nodes as DbNodes, Servers as DbServers };
-use utils::ssh::Session;
+use tokio::process::Command;
+use utils::{cmd::Cmd, ssh::{Session, SshConfig}};
 
 
 pub use sqlx::SqlitePool as Pool;
+
+use crate::{app::App, ssh_config};
 
 pub const SSL_ROOT_PARENT: &'static str = "/etc/ssl/icitifysms";
 
@@ -201,7 +204,14 @@ impl Node{
             .fetch_one::<DbNodes>().await?;
         Ok(Self::from_db_row(db_row)?)
     }
-        
+    
+
+    pub fn from_data(data: NodeData, ) -> Self {
+        Self {
+            node_id: data.node_id.clone(),
+            pool: SqlitePool::connect_lazy("").unwrap()
+        }
+    }
 
 
     pub fn from_db_row(row: DbNodes) -> Result<NodeData> {
@@ -395,8 +405,8 @@ impl Node{
     }
 
 
-    pub async fn ssh_config(&self) -> Result<SshConfig> {
-        NodeSshConfig::new(&self.node_id, &self.pool).await?.data().await
+    pub async fn ssh_config(&self) -> Result<NodeSshConfig> {
+        NodeSshConfig::new(&self.node_id, &self.pool).await
     }
 
 
@@ -406,16 +416,9 @@ impl Node{
 
 
 
-pub struct SshConfig {
-    pub host: String,
-    pub host_name: String,
-    pub user: String,
-    pub identity_file: String,
-}
-
-
 pub struct NodeSshConfig {
-    pub node: NodeData,
+    pub node: Node,
+    pub node_data: NodeData,
     pub server: ServerData,
     pub app_domain: Option<String>,
     pub is_server_wide: bool,
@@ -428,8 +431,9 @@ impl NodeSshConfig {
     
     pub async fn new(node_id: &str, pool: &SqlitePool) -> Result<Self> {
 
-        let node = Node::new(node_id, pool).data().await?;
-        let server = Server::new(&node.host, pool).data().await?;
+        let node = Node::new(node_id, pool);
+        let node_data = node.data().await?;
+        let server = Server::new(&node_data.host, pool).data().await?;
         let config = Config::new(pool);
         let is_server_wide = config.is_server_wide().await;
         let app_domain = if is_server_wide {
@@ -441,6 +445,7 @@ impl NodeSshConfig {
         
         Ok(Self {
             node,
+            node_data,
             server,
             app_domain,
             is_server_wide,
@@ -453,17 +458,17 @@ impl NodeSshConfig {
 
         if self.is_server_wide {
             if let Some(app_domain) = &self.app_domain {
-                return Ok(format!("{app_id}.{app_domain}", app_id = self.node.app_id));
+                return Ok(format!("{app_id}.{app_domain}", app_id = self.node_data.app_id));
             }else{
                 return Ok(self.server.hostname.clone());
             }
         }
         
-        if let Some(hostname) = &self.node.hostname {
+        if let Some(hostname) = &self.node_data.hostname {
             return Ok(hostname.clone());
         }
 
-        Ok(format!("{}_{}", self.node.ssh.username, self.node.host))
+        Ok(format!("{}_{}", self.node_data.ssh.username, self.node_data.host))
         
     }
 
@@ -473,7 +478,7 @@ impl NodeSshConfig {
         let user = if self.is_server_wide {
             self.server.username.clone()
         } else {
-            self.node.ssh.username.clone()
+            self.node_data.ssh.username.clone()
         };
         Ok(user)
     }
@@ -484,9 +489,43 @@ impl NodeSshConfig {
         let host_name = if self.is_server_wide {
             self.server.ip.clone()
         } else {
-            self.node.host.clone()
+            self.node_data.host.clone()
         };
         Ok(host_name)
+    }
+
+
+
+    pub fn config_path(&self) -> Result<PathBuf> {
+        let document_root = App::document_root();
+        Ok(Path::new(&document_root).join(".ssh/config"))
+    }
+
+
+
+    pub async fn write(&self) -> Result<()> {
+        let ssh_config = self.data().await?;
+        let config_path = self.config_path()?;
+
+        ssh_config::add_or_update_host(
+            &config_path,
+            &ssh_config.host,
+            &ssh_config.host_name,
+            &ssh_config.user,
+            &ssh_config.identity_file
+        ).await?;
+
+
+        if !Session::test_ssh(&ssh_config.host).await? {
+
+            if self.is_server_wide{
+                bail!("Could not connect to host {host}. Ensure that you add \"{config_path}\" to ~/.ssh/config.", host = ssh_config.host, config_path = config_path.display());
+            } else {
+                Cmd::exec(Command::new("webman").args(&["push", "pbk", &self.node_data.node_id])).await?;
+            }
+        }
+
+        Ok(())
     }
 
 

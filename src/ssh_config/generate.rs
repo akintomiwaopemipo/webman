@@ -22,7 +22,7 @@ pub async fn action(_args: Args) -> Result<()> {
         
         let node = Node::new(&node_id, &pool);
         let node_data = node.data().await?;
-        let ssh_config = node.ssh_config().await?;
+        let ssh_config = node.ssh_config().await?.data().await?;
 
         config_string = format!(
             "{config_string}Host {Host}\n    User {User}\n    HostName {HostName}\n    PasswordAuthentication false\n    PubkeyAuthentication true\n    IdentityFile {IdentifyFile}\n\n\n",

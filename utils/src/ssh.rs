@@ -4,7 +4,16 @@ use eyre::{Result, bail, eyre};
 use home::home_dir;
 use russh::{ChannelMsg, client, keys::{PrivateKeyWithHashAlg, PublicKey, load_secret_key}};
 use russh_sftp::client::SftpSession;
-use tokio::{io::AsyncWriteExt, sync::mpsc::{Receiver, Sender}};
+use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc::{Receiver, Sender}};
+
+
+pub struct SshConfig {
+    pub host: String,
+    pub host_name: String,
+    pub user: String,
+    pub identity_file: String,
+}
+
 
 struct ClientHandler;
 
@@ -404,6 +413,23 @@ impl Session {
         file.flush().await?;
 
         Ok(())
+    }
+
+
+
+
+    pub async fn test_ssh(host: &str) -> Result<bool> {
+        let status = Command::new("ssh")
+            .args([
+                "-o", "BatchMode=yes",
+                "-o", "ConnectTimeout=5",
+                host,
+                "exit",
+            ])
+            .status()
+            .await?;
+
+        Ok(status.success())
     }
 
 
