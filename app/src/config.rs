@@ -304,16 +304,6 @@ impl Node{
         Ok(())
     }
 
-    
-    
-    pub async  fn hostname(&self) -> Result<String> {
-        let node = self.data().await?;
-        if node.hostname.is_some(){
-            Ok(node.hostname.clone().unwrap())
-        }else{
-            Ok(format!("{}_{}", node.ssh.username, node.host))
-        }
-    }
 
 
     pub async fn remote_dir(&self) -> Result<String> {
@@ -405,12 +395,111 @@ impl Node{
     }
 
 
+    pub async fn ssh_config(&self) -> Result<SshConfig> {
+        NodeSshConfig::new(&self.node_id, &self.pool).await?.data().await
+    }
+
+
 }
 
 
 
 
 
+pub struct SshConfig {
+    pub host: String,
+    pub host_name: String,
+    pub user: String,
+    pub identity_file: String,
+}
+
+
+pub struct NodeSshConfig {
+    pub node: NodeData,
+    pub server: ServerData,
+    pub app_domain: Option<String>,
+    pub is_server_wide: bool,
+    pub identity_file: String,
+}
+
+
+
+impl NodeSshConfig {
+    
+    pub async fn new(node_id: &str, pool: &SqlitePool) -> Result<Self> {
+
+        let node = Node::new(node_id, pool).data().await?;
+        let server = Server::new(&node.host, pool).data().await?;
+        let config = Config::new(pool);
+        let is_server_wide = config.is_server_wide().await;
+        let app_domain = if is_server_wide {
+            config.app_domain().await.ok()
+        } else {
+            None
+        };
+        let identity_file = config.ssh_identity_file().await.unwrap_or("~/.ssh/id_rsa".into());
+        
+        Ok(Self {
+            node,
+            server,
+            app_domain,
+            is_server_wide,
+            identity_file,
+        })
+    }
+
+
+    pub async fn host(&self) -> Result<String> {
+
+        if self.is_server_wide {
+            if let Some(app_domain) = &self.app_domain {
+                return Ok(format!("{app_id}.{app_domain}", app_id = self.node.app_id));
+            }else{
+                return Ok(self.server.hostname.clone());
+            }
+        }
+        
+        if let Some(hostname) = &self.node.hostname {
+            return Ok(hostname.clone());
+        }
+
+        Ok(format!("{}_{}", self.node.ssh.username, self.node.host))
+        
+    }
+
+
+    pub async fn user(&self) -> Result<String> {
+
+        let user = if self.is_server_wide {
+            self.server.username.clone()
+        } else {
+            self.node.ssh.username.clone()
+        };
+        Ok(user)
+    }
+
+
+
+    pub async fn host_name(&self) -> Result<String> {
+        let host_name = if self.is_server_wide {
+            self.server.ip.clone()
+        } else {
+            self.node.host.clone()
+        };
+        Ok(host_name)
+    }
+
+
+    pub async fn data(&self) -> Result<SshConfig> {
+        Ok(SshConfig {
+            host: self.host().await?,
+            host_name: self.host_name().await?,
+            user: self.user().await?,
+            identity_file: self.identity_file.clone()
+        })
+    }
+
+}
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -693,6 +782,16 @@ impl Config {
     pub async fn is_server_wide(&self) -> bool {
         let server_wide_metadata = self.metadata("server_wide").await.unwrap_or_default();
         server_wide_metadata.trim() == "1"
+    }
+
+
+    pub async fn app_domain(&self) -> Result<String> {
+        self.metadata("app_domain").await
+    }
+
+
+    pub async fn ssh_identity_file(&self) -> Result<String> {
+        self.metadata("ssh_identity_file").await
     }
     
     

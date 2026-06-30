@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use serde::{Deserialize, Serialize};
 use mysql::*;
@@ -387,12 +387,15 @@ pub fn print_header_block(title: &str){
 }
 
 
-pub trait ToPathString {
-    fn to_path_string(&self) -> String;
+pub trait PathExt {
+    fn as_string(&self) -> String;
 }
 
-impl ToPathString for PathBuf{
-    fn to_path_string(&self) -> String {
-        self.clone().into_os_string().into_string().unwrap()
+impl<T> PathExt for T
+where
+    T: AsRef<Path>,
+{
+    fn as_string(&self) -> String {
+        self.as_ref().to_string_lossy().into_owned()
     }
 }
