@@ -515,6 +515,14 @@ impl NodeSshConfig {
             &ssh_config.identity_file
         ).await?;
 
+        Ok(())
+    }
+
+
+    pub async fn preflight(&self) -> Result<()> {
+        
+        let ssh_config = self.data().await?;
+        let config_path = self.config_path()?;
 
         if !Session::test_ssh(&ssh_config.host).await? {
 

@@ -9,8 +9,11 @@ pub struct Args{
     #[arg(help = "The node ID of the node, also the hostname of the SSH config")]
     node_id: Option<String>,
 
+    #[arg(long)]
+    preflight: bool,
+
     #[arg(short, long, help = "Verbose output")]
-    verbose: bool
+    verbose: bool,
 }
 
 
@@ -23,12 +26,16 @@ pub async fn action(args: Args) -> Result<()> {
     let node = Node::new(&node_id, &pool);
     let ssh_config = node.ssh_config().await?;
     let ssh_config_data = ssh_config.data().await?;
+
+    ssh_config.write().await?;
     
     let host = ssh_config_data.host.clone();
     
     let default_remote_dir = node.document_root().await?;
 
-    ssh_config.write().await?;
+    if args.preflight {
+        ssh_config.preflight().await?;
+    }
 
     Cmd::run(Command::new("code").args(&[&format!("--remote=ssh-remote+{host}"), &default_remote_dir])).await?;
 
