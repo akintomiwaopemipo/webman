@@ -119,8 +119,6 @@ pub async fn action(_args: Args) -> Result<()> {
     let mut server_ssh = node.server().await?.ssh().await?;
     let mut central_server_ssh = Server::central_server(&pool).await?.ssh().await?;
 
-    central_server_ssh.exec_stream_to_stdout(&format!("icitifysms-central node legacy-php configure {node_id}")).await?;
-
     println!("Restarting Icitifysms Webserver");
     server_ssh.exec(&format!(r#"systemctl restart icitifysms-webserver && echo "Restarted Icitifysms Webserver" "#)).await?;
 
