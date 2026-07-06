@@ -8,21 +8,21 @@ pub struct Cmd;
 
 impl Cmd {
 
-    pub async fn run(cmd: &mut Command) -> Result<String> {
-        let output = cmd.output().await?;
 
-        if !output.status.success() {
-            bail!(
-                "command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+    pub async fn run(command: &mut Command) -> Result<()> {
+        let status = command
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()
+            .await?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            bail!("{:?} exited with {status}", command.as_std().get_program().to_string_lossy())
         }
-
-        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-
-        Ok(stdout.trim().to_string())
     }
-
 
 
     pub async fn exec(cmd: &mut Command) -> Result<String> {
@@ -92,6 +92,23 @@ impl Cmd {
         }
 
         Ok(String::from_utf8_lossy(&stdout_bytes).into_owned())
+    }
+
+
+
+    pub async fn output(cmd: &mut Command) -> Result<String> {
+        let output = cmd.output().await?;
+
+        if !output.status.success() {
+            bail!(
+                "command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+
+        Ok(stdout.trim().to_string())
     }
 
 
