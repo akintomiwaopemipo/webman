@@ -14,6 +14,7 @@ use utils::{cmd::Cmd, ssh::{Session, SshConfig}};
 
 
 pub use sqlx::SqlitePool as Pool;
+use utoipa::ToSchema;
 
 use crate::{app::App, ssh_config};
 
@@ -21,7 +22,7 @@ pub const SSL_ROOT_PARENT: &'static str = "/etc/ssl/icitifysms";
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct NodeSsh {
     
     pub username: String,
@@ -32,7 +33,7 @@ pub struct NodeSsh {
 }
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct NodeMySql {
     
     pub username: Option<String>,
@@ -47,7 +48,7 @@ pub struct NodeMySql {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct NodeBackup{
     pub bucket: String,
 
@@ -57,7 +58,7 @@ pub struct NodeBackup{
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct NodeData {
 
     pub node_id: String,
@@ -102,7 +103,7 @@ pub struct NodeData {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct ServerData {
 
     pub ip: String,
@@ -121,7 +122,7 @@ pub struct ServerData {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct Test {
     
     pub node_id: String,
@@ -132,7 +133,7 @@ pub struct Test {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct GitConfigUser{
 
     pub name: String,
@@ -142,7 +143,7 @@ pub struct GitConfigUser{
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct GitConfig{
     
     pub user: GitConfigUser
@@ -151,7 +152,7 @@ pub struct GitConfig{
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct Git {
 
     pub config: GitConfig
