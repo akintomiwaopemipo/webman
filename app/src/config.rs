@@ -329,7 +329,7 @@ impl Node{
 
 
     pub async fn find(identifier: &str, pool: &SqlitePool) -> Result<String> {
-        // 1. Exact node_id
+        
         if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
             .set_column(Nodes::NodeId, identifier.into())
             .select_column(Nodes::NodeId)
@@ -339,7 +339,7 @@ impl Node{
             return Ok(node_id);
         }
 
-        // 2. Exact app_id
+
         if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
             .set_column(Nodes::AppId, identifier.into())
             .select_column(Nodes::NodeId)
@@ -349,7 +349,6 @@ impl Node{
             return Ok(node_id);
         }
 
-        // 3. Partial app_id
         if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
             .set_column(Nodes::AppId, identifier.into())
             .select_column(Nodes::NodeId)
