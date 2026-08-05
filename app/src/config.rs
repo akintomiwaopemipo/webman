@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use eyre::{Result, bail, eyre};
 use db::tables::{ Nodes as DbNodes, Servers as DbServers };
+use strsim::jaro_winkler;
 use tokio::process::Command;
 use utils::{cmd::Cmd, ssh::{Session, SshConfig}};
 
@@ -324,6 +325,79 @@ impl Node{
             .delete().await?;
         Ok(())
     }
+
+
+
+    pub async fn find(identifier: &str, pool: &SqlitePool) -> Result<String> {
+        // 1. Exact node_id
+        if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
+            .set_column(Nodes::NodeId, identifier.into())
+            .select_column(Nodes::NodeId)
+            .fetch_optional::<(String,)>()
+            .await?
+        {
+            return Ok(node_id);
+        }
+
+        // 2. Exact app_id
+        if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
+            .set_column(Nodes::AppId, identifier.into())
+            .select_column(Nodes::NodeId)
+            .fetch_optional::<(String,)>()
+            .await?
+        {
+            return Ok(node_id);
+        }
+
+        // 3. Partial app_id
+        if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
+            .add_expression(
+                Expr::col(Nodes::AppId)
+                    .like(format!("%{identifier}%")),
+            )
+            .select_column(Nodes::NodeId)
+            .fetch_optional::<(String,)>()
+            .await?
+        {
+            return Ok(node_id);
+        }
+
+        let prefix = identifier
+            .chars()
+            .take(2)
+            .collect::<String>();
+
+        let candidates = Crud::new(Nodes::Table, pool)
+            .add_expression(
+                Expr::col(Nodes::AppId)
+                    .like(format!("{prefix}%")),
+            )
+            .select_column(Nodes::AppId)
+            .limit(100)
+            .fetch::<(String,)>()
+            .await?;
+
+        let closest = candidates
+            .into_iter()
+            .map(|(app_id,)| {
+                let score = jaro_winkler(identifier, &app_id);
+                (app_id, score)
+            })
+            .max_by(|a, b| a.1.total_cmp(&b.1));
+        
+
+        if let Some((app_id, score)) = closest {
+            // Don't suggest completely unrelated values.
+            if score >= 0.75 {
+                bail!(
+                    "Could not find identifier: {identifier}. Did you mean '{app_id}'?"
+                );
+            }
+        }
+
+        bail!("Could not find identifier: {identifier}");
+    }
+
 
 
 

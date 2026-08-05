@@ -4,7 +4,7 @@ use eyre::Result;
 #[derive(clap::Args)]
 pub struct Args{
     #[arg(help = "NodeId to push receive config")]
-    node_id: Option<String>,
+    identifier: Option<String>,
 
     #[arg(short, long, help = "Upload config to all active nodes")]
     all: bool
@@ -17,8 +17,8 @@ pub async fn action(args: Args) -> Result<()> {
     
     let push_to_all_nodes = args.all;
 
-    if let Some(node_id) = args.node_id{
-
+    if let Some(identifier) = args.identifier{
+        let node_id = Node::find(&identifier, &pool).await?;
         Node::new(&node_id, &pool).push().await?;
 
     }else if push_to_all_nodes {

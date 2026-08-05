@@ -10,7 +10,7 @@ mod root;
 #[derive(clap::Args)]
 pub struct Args{
 
-    node_id: Option<String>,
+    identifier: String,
 
     #[command(subcommand)]
     pub command: Option<Commands>
@@ -51,7 +51,7 @@ pub async fn action(args: Args) -> Result<()> {
         }
     }else{
         let pool = ConfigDb::connection_pool().await?;
-        let node_id = args.node_id.unwrap();
+        let node_id = Node::find(&args.identifier, &pool).await?;
         let node = Node::new(&node_id, &pool).data().await?;
         println!("{}", json_stringify_pretty(node));
     }

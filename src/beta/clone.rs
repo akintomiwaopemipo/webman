@@ -4,8 +4,8 @@ use eyre::Result;
 
 #[derive(clap::Args)]
 pub struct Args{
-    #[arg(help = "NodeId of node to be cloned to beta")]
-    node_id: Option<String>,
+
+    identifier: String,
 
     #[arg(short = 'x', help = "Extract upload specs directory")]
     extract: bool,
@@ -23,7 +23,7 @@ pub struct Args{
 pub async  fn action(args: Args) -> Result<()> {
 
     let pool = ConfigDb::connection_pool().await?;
-    let node_id = args.node_id.unwrap();
+    let node_id = Node::find(&args.identifier, &pool).await?;
     let node = Node::new(&node_id, &pool);
     let node_data = node.data().await?;
     let beta = Node::new("template", &pool);

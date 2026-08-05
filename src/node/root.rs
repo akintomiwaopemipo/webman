@@ -9,7 +9,7 @@ use util::shell_exec;
 
 #[derive(clap::Args)]
 pub struct Args{
-    node_id: String,
+    identifier: String,
 
     #[arg(long)]
     json: bool,
@@ -30,7 +30,7 @@ pub struct Args{
 
 pub async fn action(args: Args) -> Result<()> {
     let pool = ConfigDb::connection_pool().await?;
-    let node_id = args.node_id;
+    let node_id = Node::find(&args.identifier, &pool).await?;
     let node = Node::new(&node_id, &pool);
     let node_data = node.data().await?;
     let root_ip = node_data.host;

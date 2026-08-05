@@ -4,8 +4,8 @@ use sqlx::SqlitePool;
 
 #[derive(clap::Args)]
 pub struct Args{
-    #[arg(help = "NodeId of node for virtual host config")]
-    node_id: Option<String>,
+
+    identifier: String,
 
     #[arg(short, long, help = "Config all nodes")]
     all: bool,
@@ -21,7 +21,9 @@ pub async fn action(args: Args) -> Result<()> {
 
     let push_to_all_nodes = args.all;
 
-    if let Some(node_id) = args.node_id{
+    let node_id = Node::find(&args.identifier, &pool).await?;
+
+    if !push_to_all_nodes{
 
         config_virtual_host(&node_id, args.dry_run, &pool).await?;
 

@@ -24,3 +24,4 @@ fs_extra = { workspace = true }
 russh = { workspace = true }
 dirs = { workspace = true }
 utoipa = { workspace = true }
+strsim = { workspace = true }
