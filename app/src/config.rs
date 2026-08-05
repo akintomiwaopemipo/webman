@@ -317,6 +317,16 @@ impl Node{
 
 
 
+
+    pub async fn delete(&self) -> Result<()>{
+        Crud::new(Nodes::Table, &self.pool)
+            .set_column(Nodes::NodeId, self.node_id.clone().into())
+            .delete().await?;
+        Ok(())
+    }
+
+
+
     pub async fn remote_dir(&self) -> Result<String> {
         let node = self.data().await?;
         Ok(format!("/home/{}", node.ssh.username))
