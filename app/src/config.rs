@@ -184,7 +184,7 @@ pub struct ConfigData {
 
 pub struct Node {
     pub node_id: String,
-    pool: SqlitePool,
+    pub pool: SqlitePool,
 }
 
 
