@@ -318,7 +318,7 @@ impl Node{
 
 
 
-    pub async fn delete(&self) -> Result<()>{
+    pub async fn remove(&self) -> Result<()>{
         Crud::new(Nodes::Table, &self.pool)
             .set_column(Nodes::NodeId, self.node_id.clone().into())
             .delete().await?;
