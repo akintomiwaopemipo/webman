@@ -351,10 +351,7 @@ impl Node{
 
         // 3. Partial app_id
         if let Some((node_id,)) = Crud::new(Nodes::Table, pool)
-            .add_expression(
-                Expr::col(Nodes::AppId)
-                    .like(format!("%{identifier}%")),
-            )
+            .set_column(Nodes::AppId, identifier.into())
             .select_column(Nodes::NodeId)
             .fetch_optional::<(String,)>()
             .await?
@@ -384,7 +381,7 @@ impl Node{
                 (app_id, score)
             })
             .max_by(|a, b| a.1.total_cmp(&b.1));
-        
+
 
         if let Some((app_id, score)) = closest {
             // Don't suggest completely unrelated values.
