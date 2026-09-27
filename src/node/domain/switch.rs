@@ -5,7 +5,12 @@ use eyre::Result;
 
 #[derive(clap::Args)]
 pub struct Args{
-    identifier: String
+    
+    identifier: String,
+
+    #[clap(short='d',long)]
+    remove_custom_domain: bool,
+
 }
 
 
@@ -13,7 +18,7 @@ pub struct Args{
 pub async fn action(args: Args) -> Result<()> {
     let pool = ConfigDb::connection_pool().await?;
     let node_id = Node::find(&args.identifier, &pool).await?;
-    let new_domain = Domain::new(&node_id, pool).switch().await?;
+    let new_domain = Domain::new(&node_id, pool).switch(args.remove_custom_domain).await?;
     println!("Node domain switched to {new_domain}");
 
     Ok(())

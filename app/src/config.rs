@@ -11,6 +11,7 @@ use eyre::{Result, bail, eyre};
 use db::tables::{ Nodes as DbNodes, Servers as DbServers };
 use strsim::jaro_winkler;
 use tokio::process::Command;
+use util::stdin;
 use utils::{cmd::Cmd, ssh::{Session, SshConfig}};
 
 
@@ -544,18 +545,18 @@ impl Domain {
         Self { pool: pool.clone(), node: Node::new(node_id, &pool) }
     }
 
-    pub async fn switch(&self) -> Result<String> {
+    pub async fn switch(&self, remove_custom_domain: bool) -> Result<String> {
 
         let current_domain = if self.is_app_domain().await? {
             if let Some(custom_domain) = self.node.custom_domain().await? {
-                self.write(&custom_domain).await?;
+                self.write(&custom_domain, remove_custom_domain).await?;
                 custom_domain
             }else{
                 bail!("Custom domain is not set for this node");
             }
         }else{
             let app_domain = self.node.app_domain().await?;
-            self.write(&app_domain).await?;
+            self.write(&app_domain, remove_custom_domain).await?;
             app_domain
         };
 
@@ -576,11 +577,24 @@ impl Domain {
     }
 
 
-    pub async fn write(&self, domain_name: &str) -> Result<()> {
+    pub async fn write(&self, domain_name: &str, remove_custom_domain: bool) -> Result<()> {
         let mut node_data = self.node.data().await?;
         node_data.domain_name = domain_name.to_string();
         node_data.node_url = format!("https://{domain_name}");
         node_data.backup.bucket = domain_name.to_string();
+        if remove_custom_domain {
+            println!("New domain name: {domain_name}");
+            let response =stdin("Do you want to remove the custom domain? (y/N): ");
+            
+            if response.to_lowercase() == "y" {
+                node_data.custom_domain = None;
+                println!("Custom domain removed.");
+            }else{
+                println!("Custom domain NOT removed.");
+            }
+
+
+        }
         Node::update(node_data, &self.pool).await?;
         Ok(())
     }
