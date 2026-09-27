@@ -470,6 +470,40 @@ impl Node{
 
 
 
+    pub async fn app_domain(&self) -> Result<String> {
+        let app_id = &self.data().await?.app_id;
+        let root_domain = Config::new(&self.pool).app_domain().await?;
+        Ok(format!("{app_id}.{root_domain}"))
+    }
+
+
+
+    pub async fn custom_domain(&self) -> Result<Option<String>> {
+        Ok(self.data().await?.custom_domain.clone())
+    }
+
+
+    pub async fn restart_systemctl_services(&self) -> Result<()> {
+        let config = Config::new(&self.pool);
+        if let Ok(systemctl_services_string) = config.metadata("systemctl_services").await {
+            if !systemctl_services_string.trim().is_empty() {
+                
+                let mut ssh = self.ssh().await?;
+
+                for service in systemctl_services_string.split(',') {
+                    let service = service.trim();
+                    if !service.is_empty() {
+                        ssh.exec(&format!("sudo systemctl restart {service}")).await?;
+                        println!("Restarted systemctl service: {service}");
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+
+
     pub async fn push(&self) -> Result<()> {
 
         let config = Config::new(&self.pool).data().await?;
@@ -491,6 +525,65 @@ impl Node{
     }
 
 
+}
+
+
+
+
+
+
+pub struct Domain {
+    pool: SqlitePool,
+    node: Node,
+}
+
+
+impl Domain {
+
+    pub fn new(node_id: &str, pool: SqlitePool) -> Self{
+        Self { pool: pool.clone(), node: Node::new(node_id, &pool) }
+    }
+
+    pub async fn switch(&self) -> Result<String> {
+
+        let current_domain = if self.is_app_domain().await? {
+            if let Some(custom_domain) = self.node.custom_domain().await? {
+                self.write(&custom_domain).await?;
+                custom_domain
+            }else{
+                bail!("Custom domain is not set for this node");
+            }
+        }else{
+            let app_domain = self.node.app_domain().await?;
+            self.write(&app_domain).await?;
+            app_domain
+        };
+
+        self.node.push().await?;
+
+        self.node.restart_systemctl_services().await?;
+
+        Ok(current_domain)
+
+    }
+
+    pub async fn is_app_domain(&self) -> Result<bool> {
+        let node_data = self.node.data().await?;
+        let domain = node_data.domain_name.clone();
+        let app_domain = self.node.app_domain().await?;
+
+        Ok(domain == app_domain)
+    }
+
+
+    pub async fn write(&self, domain_name: &str) -> Result<()> {
+        let mut node_data = self.node.data().await?;
+        node_data.domain_name = domain_name.to_string();
+        node_data.node_url = format!("https://{domain_name}");
+        node_data.backup.bucket = domain_name.to_string();
+        Node::update(node_data, &self.pool).await?;
+        Ok(())
+    }
 }
 
 

@@ -1,16 +1,18 @@
 use app::{config::Node, config_db::ConfigDb};
 use util::json_stringify_pretty;
-use eyre::Result;
+use eyre::{Result, eyre};
 
 mod add;
 mod edit;
 mod setup;
 mod root;
+mod domain;
+
 
 #[derive(clap::Args)]
 pub struct Args{
 
-    identifier: String,
+    identifier: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>
@@ -30,7 +32,10 @@ pub enum Commands{
     Setup(setup::Args),
 
     #[command(about = "Get root of node")]
-    Root(root::Args)
+    Root(root::Args),
+
+    #[command(about = "Manage node domain")]
+    Domain(domain::Args),
 
 }
 
@@ -47,11 +52,14 @@ pub async fn action(args: Args) -> Result<()> {
             Commands::Setup(args) => setup::action(args).await?,
             
             Commands::Root(args) => root::action(args).await?,
+
+            Commands::Domain(args) => domain::action(args.command.unwrap()).await?,
             
         }
     }else{
         let pool = ConfigDb::connection_pool().await?;
-        let node_id = Node::find(&args.identifier, &pool).await?;
+        let identifier = args.identifier.ok_or_else(|| eyre!("Identifier is required"))?;
+        let node_id = Node::find(&identifier, &pool).await?;
         let node = Node::new(&node_id, &pool).data().await?;
         println!("{}", json_stringify_pretty(node));
     }
