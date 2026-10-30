@@ -517,8 +517,14 @@ impl Node{
         let node_data = self.data().await?;
         let mut ssh = self.ssh().await?;
 
+        let mut node_data_json = serde_json::to_value(node_data)?;
+
+        if let Some(node_data_obj) = node_data_json.as_object_mut() {
+            node_data_obj.remove("secret_key_hash");
+        }
+
         let remote_path = format!("{}/{}.json", self.document_root().await?, config.nodes_config_name);
-        ssh.upload(&remote_path, &node_data.stringify().as_bytes()).await?;
+        ssh.upload(&remote_path, &node_data_json .stringify().as_bytes()).await?;
 
         println!();
 
