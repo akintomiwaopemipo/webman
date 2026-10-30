@@ -36,6 +36,7 @@ pub enum Nodes {
     Id,
     NodeId,
     AppId,
+    SecretKey,
     Name,
     Host,
     Hostname,
@@ -63,9 +64,9 @@ pub enum Servers {
     Ip,
     Username,
     Password,
+    KeyPath,
     Hostname,
     Provider,
-    KeyPath,
 }
 
 

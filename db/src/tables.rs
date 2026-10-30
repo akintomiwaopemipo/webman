@@ -30,6 +30,7 @@ pub struct Nodes {
     pub id: i32,
     pub node_id: String,
     pub app_id: String,
+    pub secret_key: String,
     pub name: String,
     pub host: String,
     pub hostname: Option<String>,
@@ -54,8 +55,8 @@ pub struct Servers {
     pub ip: String,
     pub username: String,
     pub password: Option<String>,
+    pub key_path: Option<String>,
     pub hostname: Option<String>,
     pub provider: Option<String>,
-    pub key_path: Option<String>,
 }
 
