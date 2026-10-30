@@ -36,7 +36,7 @@ pub enum Nodes {
     Id,
     NodeId,
     AppId,
-    SecretKey,
+    SecretKeyHash,
     Name,
     Host,
     Hostname,

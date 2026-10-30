@@ -67,7 +67,7 @@ pub struct NodeData {
 
     pub app_id: String,
 
-    pub secret_key: String,
+    pub secret_key_hash: String,
 
     pub name: String,
     
@@ -223,7 +223,7 @@ impl Node{
         let node = NodeData {
             node_id: row.node_id,
             app_id: row.app_id,
-            secret_key: row.secret_key,
+            secret_key_hash: row.secret_key_hash,
             name: row.name,
             host: row.host,
             hostname: row.hostname,
@@ -274,7 +274,7 @@ impl Node{
         Crud::new(Nodes::Table, pool)
             .set_column(Nodes::NodeId, data.node_id.clone().into())
             .set_column(Nodes::AppId, data.app_id.into())
-            .set_column(Nodes::SecretKey, data.secret_key.into())
+            .set_column(Nodes::SecretKeyHash, data.secret_key_hash.into())
             .set_column(Nodes::Name, data.name.into())
             .set_column(Nodes::Host, data.host.into())
             .set_column(Nodes::Hostname, data.hostname.into())
@@ -301,7 +301,7 @@ impl Node{
 
             .set_column(Nodes::NodeId, data.node_id.clone().into())
             
-            .set_update(Nodes::SecretKey, data.secret_key.into())
+            .set_update(Nodes::SecretKeyHash, data.secret_key_hash.into())
             .set_update(Nodes::AppId, data.app_id.into())
             .set_update(Nodes::Name, data.name.into())
             .set_update(Nodes::Host, data.host.into())
