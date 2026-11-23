@@ -4,7 +4,7 @@ use crud::sqlite::Crud;
 use db::entities::{Metadata, Nodes, Servers};
 pub use indexmap::IndexMap;
 use prelude::SerdeJsonSerialize;
-use sea_query::Expr;
+use sea_query::{Expr, ExprTrait};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use eyre::{Result, bail, eyre};

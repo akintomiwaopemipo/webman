@@ -12,7 +12,7 @@ serde_json = { workspace = true }
 indexmap = { workspace = true }
 chrono = { workspace = true }
 sea-query = { workspace = true }
-sea-query-binder = { workspace = true }
+sea-query-sqlx = { workspace = true }
 sqlx = { workspace = true }
 eyre = { workspace = true }
 tracing = { workspace = true }

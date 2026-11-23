@@ -35,14 +35,13 @@ pub enum RandomFromDbContext{
 
 
 pub mod sea_query_custom_functions {
-    
-    use sea_query::{Iden, Write};
+    use sea_query::Iden;
 
     pub struct Length;
 
     impl Iden for Length {
-        fn unquoted(&self, s: &mut dyn Write) {
-            write!(s, "LENGTH").unwrap();
+        fn unquoted(&self) -> &str {
+            "LENGTH"
         }
     }
 }

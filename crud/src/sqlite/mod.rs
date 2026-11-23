@@ -17,7 +17,7 @@ use sea_query::{
     TableRef,
     UpdateStatement,
 };
-use sea_query_binder::SqlxBinder;
+use sea_query_sqlx::SqlxBinder;
 use sqlx::{sqlite::SqliteRow, Sqlite};
 use tracing::info;
 use utils::{random_hex, substrings::Substrings};
@@ -338,7 +338,7 @@ where
             }
         } else {
             statement.column(
-                ColumnRef::Asterisk,
+                ColumnRef::Asterisk(None),
             );
         }
 
@@ -349,7 +349,7 @@ where
         ) in self.columns.clone()
         {
             statement.and_where(
-                Expr::col(column).eq(value),
+                Expr::col(column).eq(&value).into(),
             );
         }
 
@@ -475,7 +475,7 @@ where
         ) in self.columns.clone()
         {
             statement.and_where(
-                Expr::col(column).eq(value),
+                Expr::col(column).eq(&value).into(),
             );
         }
 
@@ -524,8 +524,8 @@ where
         {
             condition =
                 condition.add(
-                    Expr::col(column)
-                        .eq(value),
+                    Expr::expr(Expr::col(column)
+                        .eq(&value)),
                 );
         }
 
@@ -1037,7 +1037,7 @@ where
     ) -> &mut Self {
         self.joins.push((
             JoinType::InnerJoin,
-            TableRef::Table(self.right_table.clone().into_iden()),
+            TableRef::Table(self.right_table.clone().into_iden().into(), None),
             condition,
         ));
 
@@ -1093,7 +1093,7 @@ where
             }
         } else {
             statement.column(
-                ColumnRef::Asterisk,
+                ColumnRef::Asterisk(None),
             );
         }
 
@@ -1108,7 +1108,7 @@ where
                     self.left_table.clone(),
                     column,
                 ))
-                .eq(value),
+                .eq(&value).into(),
             );
         }
 
@@ -1123,7 +1123,7 @@ where
                     self.right_table.clone(),
                     column,
                 ))
-                .eq(value),
+                .eq(&value).into(),
             );
         }
 
