@@ -68,7 +68,7 @@ pub async fn action(_args: Args) -> Result<()> {
         node_id: node_id.clone(),
         name: name.clone(),
         app_id: app_id.clone(),
-        secret_key_hash: "".to_string(),
+        secret_key_hash: None,
         domain_name: domain_name.clone(),
         custom_domain: None,
         host,

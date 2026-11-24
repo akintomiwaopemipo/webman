@@ -67,7 +67,7 @@ pub struct NodeData {
 
     pub app_id: String,
 
-    pub secret_key_hash: String,
+    pub secret_key_hash: Option<String>,
 
     pub name: String,
     
@@ -223,7 +223,7 @@ impl Node{
         let node = NodeData {
             node_id: row.node_id,
             app_id: row.app_id,
-            secret_key_hash: row.secret_key_hash,
+            secret_key_hash: Some(row.secret_key_hash),
             name: row.name,
             host: row.host,
             hostname: row.hostname,
